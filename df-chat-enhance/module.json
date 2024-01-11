@@ -29,7 +29,7 @@
     "libs/marked.min.js"
   ],
   "esmodules": [
-    "src/main.js"
+    "src/df-chat-enhance.js"
   ],
   "styles": [
     "css/df-chat-enhance.css"
