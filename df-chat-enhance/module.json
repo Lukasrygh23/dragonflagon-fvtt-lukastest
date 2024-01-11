@@ -1,11 +1,11 @@
 {
-  "id": "df-chat-enhance",
-  "title": "DF Chat Enhancements",
+  "id": "df-chat-enhance-lukas",
+  "title": "DF Chat Enhancements V11 Fix",
   "description": "Various enhancements to the chat features.",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "compatibility": {
     "minimum": "10",
-    "verified": "10.288"
+    "verified": "11.315"
   },
   "relationships": {
     "requires": [
