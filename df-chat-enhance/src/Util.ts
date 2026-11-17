@@ -1,4 +1,10 @@
 export default class UTIL {
+	static asJQuery<T extends HTMLElement = HTMLElement>(html: JQuery<T> | T | null | undefined): JQuery<T> {
+		if (!html) return $() as JQuery<T>;
+		if (typeof (html as any).find === 'function') return html as JQuery<T>;
+		return $(html) as JQuery<T>;
+	}
+
 	static async requestReload() {
 		if (await Dialog.confirm({
 			title: "DF_CHAT_ENHANCE.ReloadGameTitle".localize(),

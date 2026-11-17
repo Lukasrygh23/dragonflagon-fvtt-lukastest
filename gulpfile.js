@@ -141,7 +141,10 @@ function buildManifest(output = null) {
 	output = output || DIST;
 	return desc('build Manifest', (cb) => gulp.src(output + SOURCE + GLOB) // collect the source files
 		.pipe(gulp.src(output + CSS + GLOB)) // grab all the CSS files
-		.on('data', file => files.push(file.path.replace(file.base, file.base.replace(file.cwd + '/', '')))) // Collect all the file paths
+		.on('data', file => {
+			const rel = path.relative(process.cwd(), file.path).replace(/\\/g, '/');
+			files.push(rel);
+		}) // Collect all the file paths
 		.on('end', () => { // output the filepaths to the module.json
 			if (files.length == 0)
 				throw Error('No files found in ' + SOURCE + GLOB + " or " + CSS + GLOB);

@@ -159,16 +159,16 @@ export default class ChatMerge {
 		return wrapper(messageId, { deleteAll });
 	}
 
-	private static _processAllMessage(element?: JQuery<HTMLElement>) {
-		element = element ?? $(document.body);
+	private static _processAllMessage(element?: JQuery<HTMLElement> | HTMLElement | null) {
+		const root = element ? ($(element).length ? $(element) : $(element as any)) : $(document.body);
 		// Remove the old CSS class designations
-		element.find('.dfce-cm-top').removeClass('dfce-cm-top');
-		element.find('.dfce-cm-middle').removeClass('dfce-cm-middle');
-		element.find('.dfce-cm-bottom').removeClass('dfce-cm-bottom');
+		root.find('.dfce-cm-top').removeClass('dfce-cm-top');
+		root.find('.dfce-cm-middle').removeClass('dfce-cm-middle');
+		root.find('.dfce-cm-bottom').removeClass('dfce-cm-bottom');
 		// If we are disabled, return
 		if (!ChatMerge._enabled) return;
 		// Collect all rendered chat messages
-		const messages = element.find('li.chat-message');
+		const messages = root.find('li.chat-message');
 		// Return if there are no messages rendered
 		if (messages.length === 0) return;
 		// Make sure to set the hover colour for the first message since we skip it in the processor bellow.

@@ -89,8 +89,11 @@ export default class ChatRollPrivacy {
 		return `rgb(${(current / count) * 255},${(1 - (current / count)) * 255},0)`;
 	}
 
-	private static async _handleChatLogRendering(chat: ChatLog, html: JQuery<HTMLElement>, data: ChatLogData) {
-		const modes = Object.keys(data.rollModes);
+	private static async _handleChatLogRendering(chat: ChatLog, html: JQuery<HTMLElement> | HTMLElement, data?: Partial<ChatLogData>) {
+		const $html = UTIL.asJQuery(html);
+		const rollModes = data?.rollModes ?? CONFIG.Dice?.rollModes ?? {};
+		const activeRollMode = data?.rollMode ?? game.settings.get('core', 'rollMode');
+		const modes = Object.keys(rollModes);
 		const buttons: any[] = [];
 		const iconKeys = Object.keys(ICONS_FOR_KNOWN_ROLL_TYPES);
 		for (let c = 0; c < modes.length; c++) {
@@ -101,8 +104,8 @@ export default class ChatRollPrivacy {
 			}
 			buttons.push({
 				rt: rt,
-				name: data.rollModes[rt],
-				active: data.rollMode === rt,
+				name: rollModes[rt],
+				active: activeRollMode === rt,
 				icon: ICONS_FOR_KNOWN_ROLL_TYPES[rt],
 				colour: ChatRollPrivacy.calcColour(iconKeys.findIndex(x => x == rt), iconKeys.length)
 			});
@@ -114,8 +117,8 @@ export default class ChatRollPrivacy {
 			buttonHtml.find('button.active').removeClass('active');
 			$(this).addClass('active');
 		});
-		html.find('select[name=rollMode]').after(buttonHtml);
-		html.find('select[name=rollMode]').remove();
+		$html.find('select[name=rollMode]').after(buttonHtml);
+		$html.find('select[name=rollMode]').remove();
 	
 		if (!SETTINGS.get('replace-buttons'))
 			return;
@@ -125,7 +128,7 @@ export default class ChatRollPrivacy {
 	
 		// Convert the old <a> tag elements to <button> tags
 		let first = true;
-		html.find('#chat-controls div.control-buttons a').each(function () {
+		$html.find('#chat-controls div.control-buttons a').each(function () {
 			const html = $(this).html();
 			const classes = $(this).attr('class');
 			const title = $(this).attr('title');
@@ -141,6 +144,6 @@ export default class ChatRollPrivacy {
 			buttonHtml.append(button);
 		});
 	
-		html.find('#chat-controls div.control-buttons').remove();
+		$html.find('#chat-controls div.control-buttons').remove();
 	}
 }

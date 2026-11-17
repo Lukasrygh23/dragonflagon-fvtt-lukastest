@@ -92,7 +92,7 @@ export default class DFAdventureLogProcessor {
 	static gmlogCommand: ChatCommand = null;
 	static plogCommand: ChatCommand = null;
 
-	static appendChatContextMenuOptions(options: ContextMenu.Item[]) {
+	static appendChatContextMenuOptions(options: any[]) {
 		options.push({
 			name: 'DF_CHAT_LOG.ContextMenu_AsEvent',
 			icon: '<i style="color:SeaGreen" class="fas fa-edit"></i>',

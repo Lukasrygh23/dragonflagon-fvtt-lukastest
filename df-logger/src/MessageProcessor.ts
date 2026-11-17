@@ -1,4 +1,6 @@
 
+const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+
 export interface Message {
 	tog: boolean;
 	msg: string;
@@ -36,7 +38,7 @@ export class MessageProcessor {
 			login: this.loginMessages,
 			logout: this.logoutMessages
 		})], 'user-logger-messages.json', { type: 'application/json' });
-		const response: { path?: string; message?: string } = <any>await FilePicker.upload('data', '', file);
+		const response: { path?: string; message?: string } = <any>await FilePickerAPI.upload('data', '', file);
 		if (!response.path)
 			throw new Error('Could not upload the login.json to server');
 	}

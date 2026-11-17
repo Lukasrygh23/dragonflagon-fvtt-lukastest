@@ -1,11 +1,13 @@
 import { DFChatArchive } from "./DFChatArchive";
 import SETTINGS from "../../../common/Settings";
 
-export default class DFChatArchiveNew extends FormApplication<FormApplicationOptions, { shouldDelete: boolean }> {
+const FormApplicationBase = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ?? FormApplication;
+
+export default class DFChatArchiveNew extends FormApplicationBase<FormApplicationOptions, { shouldDelete: boolean }> {
 	static readonly PREF_DELETE = 'new-should-delete';
 	static readonly PREF_HIDE_EXPORT = 'hide-export';
 	static get defaultOptions() {
-		return mergeObject(FormApplication.defaultOptions, {
+		return foundry.utils.mergeObject(FormApplication.defaultOptions, {
 			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-new.hbs`,
 			resizable: false,
 			minimizable: false,
@@ -23,7 +25,7 @@ export default class DFChatArchiveNew extends FormApplication<FormApplicationOpt
 	}
 
 	getData(options?: any) {
-		return mergeObject(super.getData(options), {
+		return foundry.utils.mergeObject(super.getData(options), {
 			shouldDelete: SETTINGS.get(DFChatArchiveNew.PREF_DELETE) as boolean
 		});
 	}

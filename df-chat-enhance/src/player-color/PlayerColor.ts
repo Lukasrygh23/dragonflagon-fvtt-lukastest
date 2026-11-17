@@ -51,10 +51,15 @@ export default class PlayerColor {
 			app.setPosition({});
 		});
 
-		libWrapperShared.register('UserConfig.prototype._updateObject',
-			async function (this: UserConfig, wrapped: (arg0: any, arg1: any) => any, event: any, formData: { "chat-color": string }): Promise<void> {
-				await this.object.setFlag(SETTINGS.MOD_NAME, PlayerColor.FLAG_CHAT_COLOR, formData["chat-color"]);
-				await wrapped(event, formData);
+		libWrapperShared.register('foundry.applications.sheets.UserConfig.prototype._onSubmit',
+			async function (this: UserConfig, wrapped: (...args: any[]) => any, event: Event, options?: { updateData?: object; preventClose?: boolean; preventRender?: boolean }): Promise<void> {
+				const form = event.target instanceof HTMLFormElement ? event.target : this.element?.[0]?.querySelector('form');
+				const formData = form instanceof HTMLFormElement ? new FormData(form) : null;
+				const chatColor = formData?.get('chat-color')?.toString();
+				if (this.object && chatColor !== undefined && chatColor !== null) {
+					await this.object.setFlag(SETTINGS.MOD_NAME, PlayerColor.FLAG_CHAT_COLOR, chatColor);
+				}
+				await wrapped(event, options);
 			});
 
 		libWrapper.register(SETTINGS.MOD_NAME, 'ChatMessage.prototype.getHTML', async function (this: ChatMessage, wrapper: (...arg: any) => Promise<JQuery<HTMLElement>>, ...args: any) {

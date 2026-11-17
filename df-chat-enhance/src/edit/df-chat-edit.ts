@@ -51,60 +51,65 @@ export default class DFChatEdit {
 			scope: 'world'
 		});
 
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype._onChatKeyDown', (wrapper: (..._: any) => void, ...args: any) => {
-			const event = args[0] as KeyboardEvent;
-			// We have used the Shift+Up combo to edit previously sent message
-			if (event.code === "ArrowUp" && event.ctrlKey) {
-				event.preventDefault();
-				let messages = <(ChatMessageData & ChatMessage)[]><any[]>[...(ui.chat.collection.values())];
-				// Perform an inverted sort ( n<0 before, n=0 same, n>0 after )
-				messages = messages.sort((a, b) => b.timestamp - a.timestamp);
-				const message = messages.find(x => x.user === game.user.id);
-				if (!message) return;
-				DFChatEdit.editChatMessage.bind(message)();
-			}
-			else
-				wrapper(...args);
-		}, 'MIXED');
-
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype.processMessage', function (this: ChatLog, wrapper: AnyFunction, message: string) {
-			let originalMessage: string = null;
-			if (SETTINGS.get(DFChatEditor.PREF_MARKDOWN)) {
-				if (message.trim().startsWith('/')) {
-					const token = message.split(' ')[0].trim();
-					switch (token) {
-						case '/ooc': /* fall-through */
-						case '/ic': /* fall-through */
-						case '/emote': /* fall-through */
-						case '/whisper': /* fall-through */
-						case '/w':
-							[originalMessage, message] = DFChatEditor.processMarkdown(message.substr(token.length));
-							originalMessage = `${token} ${originalMessage.trimStart()}`;
-							message = `${token} ${message.trimStart()}`;
-							break;
-						case 'log': /* fall-through */
-						case 'gmlog': /* fall-through */
-						case '/gmroll': /* fall-through */
-						case '/blindroll': /* fall-through */
-						case '/selfroll': /* fall-through */
-						case '/r': /* fall-through */
-						case '/roll': /* fall-through */
-						default: break;
-					}
-				} else {
-					[originalMessage, message] = DFChatEditor.processMarkdown(message);
+		if (typeof foundry.applications?.sidebar?.tabs?.ChatLog?.prototype?._onChatKeyDown === 'function') {
+			libWrapper.register(SETTINGS.MOD_NAME, 'foundry.applications.sidebar.tabs.ChatLog.prototype._onChatKeyDown', (wrapper: (..._: any) => void, ...args: any) => {
+				const event = args[0] as KeyboardEvent;
+				// We have used the Shift+Up combo to edit previously sent message
+				if (event.code === "ArrowUp" && event.ctrlKey) {
+					event.preventDefault();
+					let messages = <(ChatMessageData & ChatMessage)[]><any[]>[...(ui.chat.collection.values())];
+					// Perform an inverted sort ( n<0 before, n=0 same, n>0 after )
+					messages = messages.sort((a, b) => b.timestamp - a.timestamp);
+					const message = messages.find(x => x.user === game.user.id);
+					if (!message) return;
+					DFChatEdit.editChatMessage.bind(message)();
 				}
-			}
-			const result = wrapper(message);
-			if (originalMessage) {
-				this._sentMessages.splice(0, 1);
-				this._sentMessages.unshift(originalMessage);
-			}
-			return result;
-		}, 'WRAPPER');
+				else
+					wrapper(...args);
+			}, 'MIXED');
+		}
+
+		if (typeof foundry.applications?.sidebar?.tabs?.ChatLog?.prototype?.processMessage === 'function') {
+			libWrapper.register(SETTINGS.MOD_NAME, 'foundry.applications.sidebar.tabs.ChatLog.prototype.processMessage', function (this: ChatLog, wrapper: AnyFunction, message: string) {
+				let originalMessage: string = null;
+				if (SETTINGS.get(DFChatEditor.PREF_MARKDOWN)) {
+					if (message.trim().startsWith('/')) {
+						const token = message.split(' ')[0].trim();
+						switch (token) {
+							case '/ooc': /* fall-through */
+							case '/ic': /* fall-through */
+							case '/emote': /* fall-through */
+							case '/whisper': /* fall-through */
+							case '/w':
+								[originalMessage, message] = DFChatEditor.processMarkdown(message.substr(token.length));
+								originalMessage = `${token} ${originalMessage.trimStart()}`;
+								message = `${token} ${message.trimStart()}`;
+								break;
+							case 'log': /* fall-through */
+							case 'gmlog': /* fall-through */
+							case '/gmroll': /* fall-through */
+							case '/blindroll': /* fall-through */
+							case '/selfroll': /* fall-through */
+							case '/r': /* fall-through */
+							case '/roll': /* fall-through */
+							default: break;
+						}
+					} else {
+						[originalMessage, message] = DFChatEditor.processMarkdown(message);
+					}
+				}
+				const result = wrapper(message);
+				if (originalMessage) {
+					if (!Array.isArray(this._sentMessages)) this._sentMessages = [];
+					if (this._sentMessages.length > 0) this._sentMessages.splice(0, 1);
+					this._sentMessages.unshift(originalMessage);
+				}
+				return result;
+			}, 'WRAPPER');
+		}
 	}
 
-	static appendChatContextMenuOptions(options: ContextMenu.Item[]) {
+	static appendChatContextMenuOptions(options: any[]) {
 		options.push({
 			name: 'DF_CHAT_EDIT.ContextOption',
 			icon: '<i class="fas fa-pencil-alt"></i>',

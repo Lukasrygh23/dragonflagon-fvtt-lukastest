@@ -26,10 +26,16 @@ export default class SETTINGS {
 	}
 	static getEffectiveModuleName(moduleName: string = SETTINGS.MOD_NAME): string {
 		if (moduleName == null) return moduleName;
+
 		const alias = this.SHARED_ALIASES[moduleName];
 		if (alias && game.modules?.get(alias)?.active) {
 			return alias;
 		}
+
+		const canonical = ['df-chat-enhance', 'df-chat-enhance-lukas'];
+		const sharedOwner = canonical.find(name => name !== moduleName && game.modules?.get(name)?.active);
+		if (sharedOwner) return sharedOwner;
+
 		return moduleName;
 	}
 	static register<T>(key: string, config: ClientSettings.PartialSettingConfig<T>, moduleName: string = SETTINGS.MOD_NAME) {

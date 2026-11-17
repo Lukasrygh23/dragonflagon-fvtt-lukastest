@@ -1,6 +1,8 @@
 import DFSceneRatio from "./df-scene-ratio";
 import SETTINGS from "../../common/Settings";
 
+const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+
 interface Thumb {
 	src: string;
 	gen: boolean;
@@ -41,7 +43,7 @@ export default class DFSceneThumb {
 				target.after(injection[c]);
 			}
 			html.find('#df-thumb-btn').on('click', () => {
-				const fp = FilePicker.fromButton(html.find('#df-thumb-btn')[0] as HTMLButtonElement);
+				const fp = FilePickerAPI.fromButton(html.find('#df-thumb-btn')[0] as HTMLButtonElement);
 				app.filepickers.push(fp);
 				fp.browse('');
 			});

@@ -108,10 +108,15 @@ export function ready() {
 		});
 	});
 
-	libWrapperShared.register('UserConfig.prototype._updateObject',
-		async function (this: UserConfig, wrapped: (...args: any) => any, event: any, formData: { "player-log-page": string }) {
-			await this.object.setFlag(SETTINGS.MOD_NAME, DFAdventureLogProcessor.PREF_PLAYER_LOG_JOURNAL, formData["player-log-page"]);
-			return await wrapped(event, formData);
+	libWrapperShared.register('foundry.applications.sheets.UserConfig.prototype._onSubmit',
+		async function (this: UserConfig, wrapped: (...args: any[]) => any, event: Event, options?: { updateData?: object; preventClose?: boolean; preventRender?: boolean }) {
+			const form = event.target instanceof HTMLFormElement ? event.target : this.element?.[0]?.querySelector('form');
+			const formData = form instanceof HTMLFormElement ? new FormData(form) : null;
+			const playerLogPage = formData?.get('player-log-page')?.toString();
+			if (this.object && playerLogPage !== undefined && playerLogPage !== null && playerLogPage.length > 0) {
+				await this.object.setFlag(SETTINGS.MOD_NAME, DFAdventureLogProcessor.PREF_PLAYER_LOG_JOURNAL, playerLogPage);
+			}
+			return await wrapped(event, options);
 		});
 
 	migrateDataV9toV10();

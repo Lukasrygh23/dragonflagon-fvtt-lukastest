@@ -1,14 +1,15 @@
 import SETTINGS from "../../../common/Settings";
 import DFAdventureLogProcessor from "./DFAdventureLogProcessor";
 
+const FormApplicationBase = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ?? FormApplication;
 
-export default class DFAdventureLogConfig extends FormApplication {
+export default class DFAdventureLogConfig extends FormApplicationBase {
 	static readonly PREF_JOURNAL = 'log-journal';
 	static readonly PREF_JOURNAL_GM = 'gmlog-journal';
 	static readonly PREF_CONFIG = 'log-config-menu';
 
 	static get defaultOptions() {
-		return mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
+		return foundry.utils.mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
 			template: `modules/${SETTINGS.MOD_NAME}/templates/log-config.hbs`,
 			resizable: false,
 			minimizable: false,
@@ -75,7 +76,7 @@ export default class DFAdventureLogConfig extends FormApplication {
 		logJournals = logJournals.sort((a, b) => a.name.localeCompare(b.name));
 		gmlogJournals = gmlogJournals.sort((a, b) => a.name.localeCompare(b.name));
 
-		mergeObject(data as any, {
+		foundry.utils.mergeObject(data as any, {
 			logJournals,
 			logJournalPages,
 			gmlogJournals,

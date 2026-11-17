@@ -46,12 +46,14 @@ Hooks.once('init', function () {
 	FontSizePatch.init();
 	ChatTime.init();
 
-	libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype._getEntryContextOptions', function (wrapped: (...args: any) => ContextMenu.Item[], ...args: any) {
-		const options = wrapped(...args);
-		DFChatEdit.appendChatContextMenuOptions(options);
-		DFAdventureLogProcessor.appendChatContextMenuOptions(options);
-		return options;
-	}, 'WRAPPER');
+	if (typeof foundry.applications?.sidebar?.tabs?.ChatLog?.prototype?._getEntryContextOptions === 'function') {
+		libWrapper.register(SETTINGS.MOD_NAME, 'foundry.applications.sidebar.tabs.ChatLog.prototype._getEntryContextOptions', function (wrapped: (...args: any) => any[], ...args: any) {
+			const options = wrapped(...args) as any[];
+			DFChatEdit.appendChatContextMenuOptions(options);
+			DFAdventureLogProcessor.appendChatContextMenuOptions(options);
+			return options;
+		}, 'WRAPPER');
+	}
 });
 
 Hooks.once('ready', function () {

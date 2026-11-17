@@ -17,10 +17,34 @@ class Registration {
 	}
 }
 
+const LEGACY_GLOBAL_ALIASES: Record<string, string> = {
+	ChatLog: 'foundry.applications.sidebar.tabs.ChatLog',
+	UserConfig: 'foundry.applications.sheets.UserConfig',
+	Sidebar: 'foundry.applications.sidebar.Sidebar',
+	SceneDirectory: 'foundry.applications.sidebar.tabs.SceneDirectory'
+};
+
 export default class libWrapperShared {
 	private static registrations = new Map<string, Registration>();
 
+	private static resolveTarget(target: string): unknown {
+		const mappedTarget = target.replace(/^(\w+)(?=\.prototype\.)/, (match) => LEGACY_GLOBAL_ALIASES[match] ?? match);
+		let current: any = globalThis.foundry ?? globalThis;
+		for (const segment of mappedTarget.split('.')) {
+			if (segment === 'prototype') {
+				current = current?.prototype;
+				continue;
+			}
+			current = current?.[segment];
+		}
+		return current;
+	}
+
 	static register(target: string, handler: Handler) {
+		if (this.resolveTarget(target) === undefined) {
+			console.warn(`[${SETTINGS.MOD_NAME}] Skipping wrapper registration for missing target: ${target}`);
+			return -1;
+		}
 		let registration = this.registrations.get(target);
 		if (!registration) {
 			registration = new Registration();

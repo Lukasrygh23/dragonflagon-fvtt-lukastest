@@ -1,6 +1,8 @@
 import { ChatMessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs";
 import SETTINGS from "../../../common/Settings";
 
+const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+
 export interface DFChatArchiveEntry {
 	id: number;
 	name: string;
@@ -9,10 +11,11 @@ export interface DFChatArchiveEntry {
 	filepath: string;
 }
 
+const FormApplicationBase = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ?? FormApplication;
 
-class ArchiveFolderMenu extends FormApplication {
+class ArchiveFolderMenu extends FormApplicationBase {
 	static get defaultOptions() {
-		return mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
+		return foundry.utils.mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
 			width: 400,
 			height: 125,
 			resizable: false,
@@ -37,7 +40,7 @@ class ArchiveFolderMenu extends FormApplication {
 		const input = html.find('input#dfce-ca-folder-path')[0] as HTMLInputElement;
 		html.find('label>button').on('click', async event => {
 			event.preventDefault();
-			const fp = new FilePicker(<any>{
+			const fp = new FilePickerAPI(<any>{
 				title: 'DF_CHAT_ARCHIVE.Settings.ArchiveFolder_Name',
 				type: 'folder',
 				field: input,
@@ -65,7 +68,7 @@ export class DFChatArchive {
 	private static readonly PREF_FOLDER_MENU = 'archiveFolderMenu';
 	private static _updateListener: () => void = null;
 
-	private static get DATA_FOLDER(): FilePicker.SourceType { return SETTINGS.get(DFChatArchive.PREF_FOLDER_SOURCE); }
+	private static get DATA_FOLDER(): any { return SETTINGS.get(DFChatArchive.PREF_FOLDER_SOURCE); }
 
 	static setUpdateListener(listener: () => void) {
 		this._updateListener = listener;
@@ -113,19 +116,74 @@ export class DFChatArchive {
 			type: String,
 			default: 'data',
 		});
-		this.createArchiveFolderIfMissing();
+		void this.createArchiveFolderIfMissing().then(() => this.discoverArchivesFromFolder());
 	}
 
 	private static async createArchiveFolderIfMissing() {
 		const folder: string = SETTINGS.get(this.PREF_FOLDER);
-		await FilePicker.browse(this.DATA_FOLDER, folder)
+		await FilePickerAPI.browse(this.DATA_FOLDER, folder)
 			.catch(async _ => {
-				if (!await FilePicker.createDirectory(this.DATA_FOLDER, folder, {}))
+				if (!await FilePickerAPI.createDirectory(this.DATA_FOLDER, folder, {}))
 					throw new Error('Could not access the archive folder: ' + folder);
 			});
 	}
 
-	static getLogs(): DFChatArchiveEntry[] { return SETTINGS.get<DFChatArchiveEntry[]>(this.PREF_LOGS); }
+	static async discoverArchivesFromFolder(): Promise<DFChatArchiveEntry[]> {
+		const folder = SETTINGS.get<string>(this.PREF_FOLDER);
+		const logs = this.getLogs();
+		if (!folder) return logs;
+
+		try {
+			const result = await FilePickerAPI.browse(this.DATA_FOLDER, folder);
+			const files = (result?.files ?? [])
+				.filter((file: string) => /\.json$/i.test((file.split('/').pop() ?? '').trim()));
+			const entries: DFChatArchiveEntry[] = [];
+			const seen = new Set<string>();
+
+			for (const filePath of files) {
+				const normalized = filePath.replace(/\\/g, '/');
+				const fileName = normalized.split('/').pop() ?? normalized;
+				if (seen.has(normalized)) continue;
+				seen.add(normalized);
+
+				const existing = logs.find(log => log.filepath === normalized || log.filename === fileName);
+				if (existing) {
+					entries.push(existing);
+					continue;
+				}
+
+				const match = fileName.match(/^(\d+)[._ -]?(.*)\.json$/i);
+				const id = match ? Number.parseInt(match[1], 10) : entries.length + 1;
+				const name = match && match[2]?.trim()
+					? decodeURIComponent(match[2]).replace(/[_-]+/g, ' ').trim()
+					: fileName.replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() || 'Archive';
+				entries.push({
+					id,
+					name,
+					visible: true,
+					filename: fileName,
+					filepath: normalized
+				});
+			}
+
+			if (logs.length === 0 && entries.length > 0) {
+				await SETTINGS.set(this.PREF_LOGS, entries);
+				if (this._updateListener != null) this._updateListener();
+			}
+			return entries;
+		} catch (error) {
+			console.warn(`DF Chat Archive: could not scan archive folder ${folder}`, error);
+			return logs;
+		}
+	}
+
+	static getLogs(): DFChatArchiveEntry[] {
+		const logs = SETTINGS.get<DFChatArchiveEntry[]>(this.PREF_LOGS) ?? [];
+		if (logs.length === 0) {
+			void this.discoverArchivesFromFolder();
+		}
+		return logs;
+	}
 	static getArchive(id: number): DFChatArchiveEntry { return this.getLogs().find(x => x.id == id); }
 	static exists(id: number): boolean { return !!this.getLogs().find(x => x.id == id); }
 
@@ -138,7 +196,7 @@ export class DFChatArchive {
 		const fileName = encodeURI(`${id}_${safeName}.json`);
 		// Create the File and contents
 		const file = new File([JSON.stringify(chats, null, '')], fileName, { type: 'application/json' });
-		const response: { path?: string; message?: string } = <any>await FilePicker.upload(this.DATA_FOLDER, folderPath, file);
+		const response: { path?: string; message?: string } = <any>await FilePickerAPI.upload(this.DATA_FOLDER, folderPath, file);
 		if (!response.path) {
 			console.error(`Could not create archive ${fileName}\nReason: ${response}`);
 			throw new Error('Could not upload the archive to server: ' + fileName);
@@ -184,7 +242,7 @@ export class DFChatArchive {
 			const response: {
 				path?: string;
 				message?: string;
-			} = <any>await FilePicker.upload(this.DATA_FOLDER, folderPath, file, {});
+			} = <any>await FilePickerAPI.upload(this.DATA_FOLDER, folderPath, file, {});
 			if (!response.path)
 				throw new Error('Could not upload the archive to server side: ' + archive.id.toString());
 		}
@@ -202,7 +260,7 @@ export class DFChatArchive {
 		// Can not delete files currently, truncate instead to make filtering easier.
 		await Promise.all(logs.map(archive => {
 			const file = new File([''], archive.filename, { type: 'application/json' });
-			return FilePicker.upload(this.DATA_FOLDER, folderPath, file, {});
+			return FilePickerAPI.upload(this.DATA_FOLDER, folderPath, file, {});
 		}));
 		await SETTINGS.set(this.PREF_LOGS, []);
 		if (this._updateListener != null)
@@ -220,7 +278,7 @@ export class DFChatArchive {
 		const entry = logs[entryIdx];
 		// Cannot delete file currently, instead truncate the file and move along.
 		const file = new File([''], entry.filename, { type: 'application/json' });
-		await FilePicker.upload(this.DATA_FOLDER, folderPath, file, {});
+		await FilePickerAPI.upload(this.DATA_FOLDER, folderPath, file, {});
 		logs.splice(entryIdx, 1);
 		await SETTINGS.set(this.PREF_LOGS, logs);
 		if (this._updateListener != null)

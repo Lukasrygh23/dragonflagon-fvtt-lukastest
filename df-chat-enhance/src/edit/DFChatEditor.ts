@@ -2,12 +2,13 @@ import { ChatMessageData } from "@league-of-foundry-developers/foundry-vtt-types
 import SETTINGS from "../../../common/Settings";
 import DFChatEdit from "./df-chat-edit";
 
+const FormApplicationBase = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ?? FormApplication;
 
 declare namespace marked {
 	function parse(md: string, options: any): string;
 }
 
-export default class DFChatEditor extends FormApplication {
+export default class DFChatEditor extends FormApplicationBase {
 	private chatMessage: ChatMessageData & ChatMessage;
 	public static readonly PREF_MARKDOWN = 'edit-markdown';
 
@@ -18,7 +19,7 @@ export default class DFChatEditor extends FormApplication {
 	 * @see {@link Application.defaultOptions}
 	 */
 	static get defaultOptions(): FormApplicationOptions {
-		return mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
+		return foundry.utils.mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
 			closeOnSubmit: true,
 			editable: true,
 			resizable: true,
@@ -55,7 +56,7 @@ export default class DFChatEditor extends FormApplication {
 		if (this.chatMessage.speaker.token)
 			selected = 'token-' + this.chatMessage.speaker.token;
 
-		return mergeObject(options, {
+		return foundry.utils.mergeObject(options, {
 			selected,
 			players: game.users.map(x => ({ id: 'user-' + x.id, name: x.name })),
 			actorGroups: types.filter(x => x.actors.length > 0),

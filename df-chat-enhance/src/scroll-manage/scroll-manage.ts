@@ -1,6 +1,7 @@
 import { ChatMessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs";
 import libWrapperShared from "../../../common/libWrapperShared";
 import SETTINGS from "../../../common/Settings";
+import UTIL from "../Util";
 import ChatHistoryOptimizer from "./ChatHistoryOptimizer";
 
 declare class ChatLogExt extends ChatLog {
@@ -13,6 +14,7 @@ export default class ScrollManage {
 	private static readonly ScrollThreshold = 50;
 	// private static _scrollToBottomButton: JQuery<HTMLElement>;
 	private static _deleteMessageRegistrationID: number | null = null;
+	private static _registeredWrapperTargets = new Set<string>();
 
 
 	static get enabled(): boolean { return SETTINGS.get(this.PREF_ENABLED); }
@@ -51,17 +53,34 @@ export default class ScrollManage {
 	}
 
 	private static register() {
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype.postOne', this._ChatLog_postOne, 'OVERRIDE');
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype.scrollBottom', this._ChatLog_scrollBottom, 'OVERRIDE');
-		this._deleteMessageRegistrationID = libWrapperShared.register('ChatLog.prototype.deleteMessage', this._ChatLog_deleteMessage);
+		const postOneTarget = 'foundry.applications.sidebar.tabs.ChatLog.prototype.postOne';
+		const scrollBottomTarget = 'foundry.applications.sidebar.tabs.ChatLog.prototype.scrollBottom';
+		if (typeof foundry.applications?.sidebar?.tabs?.ChatLog?.prototype?.postOne === 'function' && !this._registeredWrapperTargets.has(postOneTarget)) {
+			libWrapper.register(SETTINGS.MOD_NAME, postOneTarget, this._ChatLog_postOne, 'OVERRIDE');
+			this._registeredWrapperTargets.add(postOneTarget);
+		}
+		if (typeof foundry.applications?.sidebar?.tabs?.ChatLog?.prototype?.scrollBottom === 'function' && !this._registeredWrapperTargets.has(scrollBottomTarget)) {
+			libWrapper.register(SETTINGS.MOD_NAME, scrollBottomTarget, this._ChatLog_scrollBottom, 'OVERRIDE');
+			this._registeredWrapperTargets.add(scrollBottomTarget);
+		}
+		this._deleteMessageRegistrationID = libWrapperShared.register('foundry.applications.sidebar.tabs.ChatLog.prototype.deleteMessage', this._ChatLog_deleteMessage);
 	}
 	private static unregister() {
-		libWrapper.unregister(SETTINGS.MOD_NAME, 'ChatLog.prototype.postOne', false);
-		libWrapper.unregister(SETTINGS.MOD_NAME, 'ChatLog.prototype.scrollBottom', false);
-		libWrapperShared.unregister('ChatLog.prototype.deleteMessage', this._deleteMessageRegistrationID);
+		const postOneTarget = 'foundry.applications.sidebar.tabs.ChatLog.prototype.postOne';
+		const scrollBottomTarget = 'foundry.applications.sidebar.tabs.ChatLog.prototype.scrollBottom';
+		if (this._registeredWrapperTargets.has(postOneTarget)) {
+			libWrapper.unregister(SETTINGS.MOD_NAME, postOneTarget, false);
+			this._registeredWrapperTargets.delete(postOneTarget);
+		}
+		if (this._registeredWrapperTargets.has(scrollBottomTarget)) {
+			libWrapper.unregister(SETTINGS.MOD_NAME, scrollBottomTarget, false);
+			this._registeredWrapperTargets.delete(scrollBottomTarget);
+		}
+		libWrapperShared.unregister('foundry.applications.sidebar.tabs.ChatLog.prototype.deleteMessage', this._deleteMessageRegistrationID);
 	}
 
-	private static _renderChatLog(app: ChatLogExt, html: JQuery<HTMLElement>) {
+	private static _renderChatLog(app: ChatLogExt, html: JQuery<HTMLElement> | HTMLElement) {
+		const $html = UTIL.asJQuery(html);
 		app._scrollToBottomButton = $(`<div id="scrollToBottom" style="display:none">
 	<span>${'DF_CHAT_SCROLL.NewMessage'.localize()}</span> ${'DF_CHAT_SCROLL.ScrollButton'.localize()}
 </div>`);
@@ -72,9 +91,9 @@ export default class ScrollManage {
 				log.scrollTo({ behavior: "smooth", top: log.scrollHeight });
 			}
 		});
-		html.find('div#chat-controls').before(app._scrollToBottomButton);
+		$html.find('div#chat-controls').before(app._scrollToBottomButton);
 
-		html.find('ol#chat-log').on('scroll', (event) => {
+		$html.find('ol#chat-log').on('scroll', (event) => {
 			if (!app._scrollToBottomButton) return;
 			const element = <HTMLOListElement>event.currentTarget;
 			// Ignore events when the scroll height is too small to matter
@@ -90,10 +109,15 @@ export default class ScrollManage {
 
 	private static _ChatLog_scrollBottom(this: ChatLogExt) {
 		const el = this.element;
-		const log = el.length ? el[0].querySelector("#chat-log") : null;
+		const log = el && el.length ? el[0].querySelector('#chat-log') : null;
+		if (!log) return;
+		if (!this._scrollToBottomButton) return;
 		// If we are already at the bottom, perform the scroll
 		if (this._scrollToBottomButton.is(':hidden'))
-			setTimeout(() => log.scrollTo({ behavior: 'smooth', top: log.scrollHeight }), 100);
+			setTimeout(() => {
+				const activeLog = this.element?.[0]?.querySelector('#chat-log');
+				if (activeLog) activeLog.scrollTo({ behavior: 'smooth', top: activeLog.scrollHeight });
+			}, 100);
 		// Otherwise do not scroll, but do trigger a scroll event.
 		// Some modules might use this function after manually adding message content to the ChatLog
 		else $('#chat #chat-log').trigger('scroll');
@@ -109,14 +133,17 @@ export default class ScrollManage {
 		}
 
 		// Render the message to the log
-		const element = this.element.find("#chat-log");
-		const atBottom = element[0].scrollTop >= ((element[0].scrollHeight - element[0].clientHeight) - ScrollManage.ScrollThreshold);
+		const root = this.element && typeof (this.element as any).find === 'function' ? this.element : $(this.element ?? document);
+		const log = (root as any).find ? (root as any).find('#chat-log').get(0) : (root as any)[0]?.querySelector('#chat-log') ?? null;
+		if (!log) return;
+		const chatLog = $(log);
+		const atBottom = log.scrollTop >= ((log.scrollHeight - log.clientHeight) - ScrollManage.ScrollThreshold);
 		const html = await (<any>message).getHTML();
-		element.append(html);
+		chatLog.append(html);
 		if (atBottom || (ScrollManage.scrollToBottomIfYouSendMessage && message.isAuthor))
-			element[0].scrollTo({ top: element[0].scrollHeight, behavior: 'smooth' });
+			log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' });
 		// this.scrollBottom();
-		else {
+		else if (this._scrollToBottomButton) {
 			this._scrollToBottomButton.addClass('new');
 		}
 

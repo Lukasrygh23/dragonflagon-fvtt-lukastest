@@ -34,7 +34,9 @@ export default class ChatHistoryOptimizer {
 
 		if (!SETTINGS.get(this.PREF_ENABLED)) return;
 
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype._onScrollLog', this._ChatLog_onScrollLog, 'MIXED');
+		if (typeof foundry.applications?.sidebar?.tabs?.ChatLog?.prototype?._onScrollLog === 'function') {
+			libWrapper.register(SETTINGS.MOD_NAME, 'foundry.applications.sidebar.tabs.ChatLog.prototype._onScrollLog', this._ChatLog_onScrollLog, 'MIXED');
+		}
 
 		/**
 		// This is used for DEBUG purposes only

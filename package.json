@@ -23,7 +23,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/flamewave000/dragonflagon-fvtt.git"
+		"url": "git+https://github.com/Lukasrygh23/dragonflagon-fvtt-lukastest.git"
 	},
 	"keywords": [
 		"foundry",
@@ -34,12 +34,12 @@
 		"dragonflagon",
 		"df"
 	],
-	"author": "flamewave000#0001",
+	"author": "Lukas",
 	"license": "BSD-3-Clause",
 	"bugs": {
-		"url": "https://github.com/flamewave000/dragonflagon-fvtt/issues"
+		"url": "https://github.com/Lukasrygh23/dragonflagon-fvtt-lukastest/issues"
 	},
-	"homepage": "https://github.com/flamewave000/dragonflagon-fvtt#readme",
+	"homepage": "https://github.com/Lukasrygh23/dragonflagon-fvtt-lukastest#readme",
 	"devDependencies": {
 		"@league-of-foundry-developers/foundry-vtt-types": "^9.255.3",
 		"@prantlf/jsonlint": "^10.2.0",

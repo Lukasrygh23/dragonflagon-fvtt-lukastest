@@ -1,4 +1,5 @@
 import SETTINGS from "../../../common/Settings";
+import UTIL from "../Util";
 
 export default class SendButton {
 	private static readonly PREF_ENABLED = 'SendButton.Enabled';
@@ -29,13 +30,14 @@ export default class SendButton {
 		Hooks.on('renderChatLog', this._renderChatLog.bind(this));
 	}
 
-	private static _renderChatLog(app: ChatLog, html: JQuery<HTMLElement>) {
+	private static _renderChatLog(app: ChatLog, html: JQuery<HTMLElement> | HTMLElement) {
 		if (!SETTINGS.get<boolean>(this.PREF_ENABLED)) return;
+		const $html = UTIL.asJQuery(html);
 		const sendButton = $('<button class="dfce-send-btn"><i class="fas fa-paper-plane"></i></button>');
 		sendButton.attr('title', 'DF_CHAT_SEND_BUTTON.ButtonTitle'.localize());
-		html.find('#chat-form').append(sendButton);
+		$html.find('#chat-form').append(sendButton);
 
-		const textarea = html.find<HTMLTextAreaElement>('#chat-message');
+		const textarea = $html.find<HTMLTextAreaElement>('#chat-message');
 		sendButton.prop('disabled', textarea[0].textLength <= 0 || textarea[0].value.trim().length <= 0);
 
 		sendButton.on('click', async event => {

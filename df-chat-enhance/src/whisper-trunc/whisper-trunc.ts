@@ -38,7 +38,8 @@ export default class WhisperTruncation {
 		});
 	}
 
-	private static _messageRender(message: ChatMessageData, html: JQuery<HTMLElement>, _cmd: ChatMessageData) {
+	private static _messageRender(message: ChatMessageData, html: JQuery<HTMLElement> | HTMLElement, _cmd: ChatMessageData) {
+		const $html = UTIL.asJQuery(html);
 		// ignore regular messages, or whispers with only 1 recipient
 		if (!SETTINGS.get(this.PREF_ENABLED) || !(message.whisper) || message.whisper.length <= 1) return;
 		const users = message.whisper.map(x => game.users.get(x));
@@ -61,7 +62,7 @@ export default class WhisperTruncation {
 		if (c === users.length) return;
 		// Update the HTML
 		const newHeader = `<span class="whisper-to" title="${users.slice(c).map(x => x.name).join(', ')}">${title}</span>`;
-		html.find('span.whisper-to').replaceWith(newHeader);
+		$html.find('span.whisper-to').replaceWith(newHeader);
 	}
 
 	private static _formatTitle(names: string, count: number): string {

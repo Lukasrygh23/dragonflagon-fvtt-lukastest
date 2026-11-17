@@ -2,12 +2,18 @@ import SETTINGS from "../../../common/Settings";
 import { DFChatArchive } from "./DFChatArchive";
 import DFChatArchiveViewer from "./DFChatArchiveViewer";
 
-export default class DFChatArchiveManager extends Application {
+const ApplicationV2Base = (globalThis as any).foundry?.applications?.api?.ApplicationV2;
+const HandlebarsApplicationBase = (globalThis as any).foundry?.applications?.api?.HandlebarsApplicationMixin;
+const ApplicationBase = HandlebarsApplicationBase && ApplicationV2Base
+	? HandlebarsApplicationBase(ApplicationV2Base)
+	: Application;
+
+export default class DFChatArchiveManager extends ApplicationBase {
 	static readonly PREF_REVERSE_SORT = 'dfca-manager-reverseSort';
 	static chatViewers: Map<number, DFChatArchiveViewer> = new Map();
 
 	static get defaultOptions() {
-		return mergeObject(Application.defaultOptions as Partial<ApplicationOptions>, {
+		return foundry.utils.mergeObject((ApplicationBase as any).defaultOptions ?? Application.defaultOptions as Partial<ApplicationOptions>, {
 			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-manager.hbs`,
 			resizable: true,
 			minimizable: true,
@@ -18,13 +24,14 @@ export default class DFChatArchiveManager extends Application {
 	}
 
 	getData(options?: any) {
-		const data = super.getData(options);
+		const baseGetData = Object.getPrototypeOf(DFChatArchiveManager.prototype).getData;
+		const data = typeof baseGetData === 'function' ? baseGetData.call(this, options) : {};
 		let messages = DFChatArchive.getLogs();
 		if (!game.user.isGM)
 			messages = messages.filter(x => x.visible);
 		messages = messages.sort((a, b) => a.name.localeCompare(b.name));
 		const reverseSort = SETTINGS.get<boolean>(DFChatArchiveManager.PREF_REVERSE_SORT);
-		mergeObject(data, {
+		foundry.utils.mergeObject(data, {
 			messages: reverseSort ? messages.reverse() : messages,
 			isGM: game.user.isGM,
 			reverseSort

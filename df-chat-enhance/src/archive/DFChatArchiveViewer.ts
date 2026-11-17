@@ -1,7 +1,14 @@
 import { ChatMessageData } from '@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs';
+import SETTINGS from '../../../common/Settings';
 import { DFChatArchive, DFChatArchiveEntry } from './DFChatArchive';
 
-export default class DFChatArchiveViewer extends Application {
+const ApplicationV2Base = (globalThis as any).foundry?.applications?.api?.ApplicationV2;
+const HandlebarsApplicationBase = (globalThis as any).foundry?.applications?.api?.HandlebarsApplicationMixin;
+const ApplicationBase = HandlebarsApplicationBase && ApplicationV2Base
+	? HandlebarsApplicationBase(ApplicationV2Base)
+	: Application;
+
+export default class DFChatArchiveViewer extends ApplicationBase {
 	archive: DFChatArchiveEntry;
 	messages: ChatMessageData[];
 	onCloseCallBack: (view: DFChatArchiveViewer) => void;
@@ -12,7 +19,7 @@ export default class DFChatArchiveViewer extends Application {
 	}
 
 	static get defaultOptions() {
-		return mergeObject(Application.defaultOptions as Partial<ApplicationOptions>, {
+		return foundry.utils.mergeObject((ApplicationBase as any).defaultOptions ?? Application.defaultOptions as Partial<ApplicationOptions>, {
 			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-viewer.hbs`,
 			width: 300,
 			height: 500,
