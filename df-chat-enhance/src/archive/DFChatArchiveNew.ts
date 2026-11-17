@@ -6,7 +6,7 @@ export default class DFChatArchiveNew extends FormApplication<FormApplicationOpt
 	static readonly PREF_HIDE_EXPORT = 'hide-export';
 	static get defaultOptions() {
 		return mergeObject(FormApplication.defaultOptions, {
-			template: "modules/df-chat-enhance/templates/archive-new.hbs",
+			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-new.hbs`,
 			resizable: false,
 			minimizable: false,
 			title: "DF_CHAT_ARCHIVE.ArchiveNew_Title".localize()

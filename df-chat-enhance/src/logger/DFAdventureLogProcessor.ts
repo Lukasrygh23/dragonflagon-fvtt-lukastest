@@ -336,7 +336,7 @@ export default class DFAdventureLogProcessor {
 					label: 'OK',
 					// eslint-disable-next-line @typescript-eslint/no-empty-function
 					callback: () => { },
-					content: await renderTemplate(`modules/df-chat-enhance/templates/lang/log-help.${'DF_CHAT_ENHANCE.LANG'.localize()}.hbs`, {
+					content: await renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/lang/log-help.${'DF_CHAT_ENHANCE.LANG'.localize()}.hbs`, {
 						isGM: game.user.isGM
 					}),
 					options: { width: 800 }

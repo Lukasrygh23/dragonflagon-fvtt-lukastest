@@ -11,7 +11,7 @@ import PlayerColor from './player-color/PlayerColor';
 import SendButton from "./send/send-button";
 import FontSizePatch from "./font-size/font-size";
 import ChatTime from "./chat-time/chat-time";
-SETTINGS.init('df-chat-enhance');
+SETTINGS.init('df-chat-enhance-lukas');
 
 declare global {
 	interface Application {

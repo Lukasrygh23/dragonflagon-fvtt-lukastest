@@ -18,7 +18,7 @@ class ArchiveFolderMenu extends FormApplication {
 			resizable: false,
 			minimizable: false,
 			title: 'DF_CHAT_ARCHIVE.Settings.ArchiveFolder_Name',
-			template: "modules/df-chat-enhance/templates/archive-folder.hbs",
+			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-folder.hbs`,
 			submitOnClose: false,
 			submitOnChange: false,
 			closeOnSubmit: true

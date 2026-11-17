@@ -82,7 +82,7 @@ function buildSource(output = null) {
 					exclude: /node_modules/,
 					use: [{
 						loader: 'ts-loader',
-						options: { context: process.cwd() }
+						options: { context: process.cwd(), transpileOnly: true }
 					}]
 				}]
 			},

@@ -107,7 +107,7 @@ export default class ChatRollPrivacy {
 				colour: ChatRollPrivacy.calcColour(iconKeys.findIndex(x => x == rt), iconKeys.length)
 			});
 		}
-		const buttonHtml = $(await renderTemplate('modules/df-chat-enhance/templates/privacy-button.hbs', { buttons }));
+		const buttonHtml = $(await renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/privacy-button.hbs`, { buttons }));
 		buttonHtml.find('button').on('click', function () {
 			const rollType = $(this).attr('data-id');
 			game.settings.set("core", "rollMode", <any>rollType);

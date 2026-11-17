@@ -25,7 +25,7 @@ export default class DFChatEditor extends FormApplication {
 			width: 400,
 			popOut: true,
 			title: 'DF_CHAT_EDIT.Editor_Title',
-			template: 'modules/df-chat-enhance/templates/chat-edit.hbs'
+			template: `modules/${SETTINGS.MOD_NAME}/templates/chat-edit.hbs`
 		}) as FormApplicationOptions;
 	}
 

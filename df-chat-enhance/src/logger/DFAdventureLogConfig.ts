@@ -9,7 +9,7 @@ export default class DFAdventureLogConfig extends FormApplication {
 
 	static get defaultOptions() {
 		return mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
-			template: "modules/df-chat-enhance/templates/log-config.hbs",
+			template: `modules/${SETTINGS.MOD_NAME}/templates/log-config.hbs`,
 			resizable: false,
 			minimizable: false,
 			title: "DF_CHAT_LOG.Config_Title".localize()

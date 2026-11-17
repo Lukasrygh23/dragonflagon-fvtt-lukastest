@@ -43,6 +43,7 @@
 	"devDependencies": {
 		"@league-of-foundry-developers/foundry-vtt-types": "^9.255.3",
 		"@prantlf/jsonlint": "^10.2.0",
+		"@types/node": "16.18.101",
 		"@typescript-eslint/eslint-plugin": "^5.3.1",
 		"@typescript-eslint/parser": "^5.3.1",
 		"acorn": "^8.5.0",

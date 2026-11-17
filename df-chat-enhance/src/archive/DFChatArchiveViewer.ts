@@ -13,7 +13,7 @@ export default class DFChatArchiveViewer extends Application {
 
 	static get defaultOptions() {
 		return mergeObject(Application.defaultOptions as Partial<ApplicationOptions>, {
-			template: "modules/df-chat-enhance/templates/archive-viewer.hbs",
+			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-viewer.hbs`,
 			width: 300,
 			height: 500,
 			resizable: true,
@@ -107,7 +107,7 @@ export default class DFChatArchiveViewer extends Application {
 					const dialog: Dialog = new Dialog({
 						title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Title'.localize(),
 						default: 'merge',
-						content: await renderTemplate('modules/df-chat-enhance/templates/archive-merge.hbs', {
+						content: await renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/archive-merge.hbs`, {
 							id: this.archive.id,
 							name: this.archive.name,
 							archives: DFChatArchive.getLogs().filter(x => x.id != this.archive.id)
