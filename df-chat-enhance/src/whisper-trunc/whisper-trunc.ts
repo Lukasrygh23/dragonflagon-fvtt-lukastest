@@ -1,5 +1,6 @@
 import { ChatMessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs";
 import SETTINGS from "../../../common/Settings";
+import UTIL from "../Util";
 
 
 const TEMPLATE = "$0: $1 (+$2&nbsp;more)";
@@ -21,9 +22,7 @@ export default class WhisperTruncation {
 			default: true,
 			scope: 'world',
 			onChange: async () => {
-				(<any>ui.chat)._state = 0;
-				(<any>ui.chat)._lastId = null;
-				await ui.chat.render(true);
+				UTIL.reloadChatLog();
 			}
 		});
 		SETTINGS.register(this.PREF_CHAR_LIMIT, {
@@ -34,9 +33,7 @@ export default class WhisperTruncation {
 			default: 50,
 			scope: 'world',
 			onChange: async () => {
-				(<any>ui.chat)._state = 0;
-				(<any>ui.chat)._lastId = null;
-				await ui.chat.render(true);
+				UTIL.reloadChatLog();
 			}
 		});
 	}

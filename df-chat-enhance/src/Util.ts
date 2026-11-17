@@ -10,9 +10,13 @@ export default class UTIL {
 	}
 
 	static reloadChatLog() {
-		// @ts-expect-error
+		if (!ui.chat) return;
+		// Foundry v13 keeps the internal render state on ChatLog, but the exact value
+		// is protected behind Application.RENDER_STATES in newer versions.
+		// @ts-expect-error - internal reset for the chat log cache state.
 		ui.chat._lastId = null;
-		ui.chat._state = Application.RENDER_STATES.NONE;
+		// @ts-expect-error - internal state property is intentionally accessed for refreshes.
+		ui.chat._state = Application.RENDER_STATES?.NONE ?? 0;
 		ui.chat.render(true);
 	}
 }
