@@ -1,5 +1,40 @@
 # DF Chat Enhancements
 
+## Release 5.1.23
+- **UPDATE:** Verified compatible with Foundry VTT 13.351.
+
+## Release 5.1.22
+- **FIX:** Long archive lists scroll within the archive manager.
+
+## Release 5.1.21
+- **FIX:** Long chat archives scroll within the archive viewer.
+
+## Release 5.1.20
+- **FIX:** Saving a chat archive no longer submits the browser form as a page navigation.
+- **FIX:** Application settings no longer overwrite shared Foundry application defaults.
+
+## Release 5.1.0 (2025-04-24)
+- **UPDATE:** Korean Localization: Courtesy of [Jihoon9836](https://github.com/Jihoon9836)
+- **NEW #457:** New keyboard shortcut registered for a Roll Mode Quick Toggle which allows you to quickly switch between two configurable roll modes.
+- **NEW #451:** Added setting for collapsing the Adventure Log context menu options into a single option. When clicked, it will launch a dialog with the full option list. This is to help declutter the chat message context menu when using a system that adds a lot of other options.
+- **FIX #461:** Editing a message would reveal all of the token names to players. Now players will only see tokens that they own in the list.
+
+## Release 5.0.2 (2025-03-12)
+- **FIX #513:** UserConfig properly saves its data again.
+- **FIX #512:** Inline-Rolls containing markdown characters in chat function correctly again without being converted to html.
+
+## Release 5.0.1 (2025-03-01)
+- **UPDATE #468:** Update Chinese Localization: Courtesy of [LiyuNodream](https://github.com/LiyuNodream).
+
+## Release 5.0.0 (2025-02-28)
+- **UPDATE:** Migrated to v12.
+- **UPDATE:** Downgraded TS -> JS (such sad).
+- **FIX:** Several discovered bugs and problems which have accumulated over time.
+- **FIX #417:** Deleting messages after date-range archive now ONLY deletes the selected messages.
+- **FIX #408:** Keybindings no longer have defaults.
+- **FIX #387:** Adjusted flag setting in Chat Time to use `mergeObject`.
+- **FIX #415:** Public Roll icon changed from D20 icon to a more appropriate "public" icon.
+
 ## Release 4.1.0 (2022-10-23)
 - **UPDATE:** Migrated to V10.
 
