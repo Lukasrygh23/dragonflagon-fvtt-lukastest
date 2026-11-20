@@ -1,20 +1,34 @@
-import SETTINGS from "../../../common/Settings";
-import DFAdventureLogProcessor from "./DFAdventureLogProcessor";
+/// <reference path="../../../fvtt-scripts/foundry.js" />
+/// <reference path="../../../common/foundry.d.ts" />
+/// <reference path="../../../common/libWrapper.d.ts" />
+import SETTINGS from "../../common/Settings.mjs";
+import DFAdventureLogProcessor from "./DFAdventureLogProcessor.mjs";
 
+const ApplicationV2 = foundry.applications.api.ApplicationV2;
+const HandlebarsApplication = foundry.applications.api.HandlebarsApplicationMixin(ApplicationV2);
+const MODULE_ID = 'df-chat-enhance-lukas';
 
-export default class DFAdventureLogConfig extends FormApplication {
-	static readonly PREF_JOURNAL = 'log-journal';
-	static readonly PREF_JOURNAL_GM = 'gmlog-journal';
-	static readonly PREF_CONFIG = 'log-config-menu';
+export default class DFAdventureLogConfig extends HandlebarsApplication {
+	/**@readonly*/ static PREF_JOURNAL = 'log-journal';
+	/**@readonly*/ static PREF_JOURNAL_GM = 'gmlog-journal';
+	/**@readonly*/ static PREF_CONFIG = 'log-config-menu';
 
-	static get defaultOptions() {
-		return mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
-			template: "modules/df-chat-enhance/templates/log-config.hbs",
-			resizable: false,
-			minimizable: false,
-			title: "DF_CHAT_LOG.Config_Title".localize()
-		}) as FormApplicationOptions;
-	}
+	static DEFAULT_OPTIONS = {
+		id: 'df-adventure-log-config',
+		position: { width: 500 },
+		window: { title: 'DF_CHAT_LOG.Config_Title', resizable: false, minimizable: false },
+		form: {
+			handler: async function (event, _form, formData) {
+				await this._updateObject(event, formData.object);
+			},
+			submitOnChange: false,
+			closeOnSubmit: true
+		}
+	};
+
+	static PARTS = {
+		form: { template: `modules/${MODULE_ID}/templates/log-config.hbs` }
+	};
 
 	static setupSettings() {
 		SETTINGS.register(DFAdventureLogConfig.PREF_JOURNAL, {
@@ -31,21 +45,26 @@ export default class DFAdventureLogConfig extends FormApplication {
 		});
 		SETTINGS.registerMenu(DFAdventureLogConfig.PREF_CONFIG, {
 			restricted: true,
-			type: <any>DFAdventureLogConfig,
+			type: DFAdventureLogConfig,
+			name: "DF_CHAT_LOG.Config_Title",
 			label: "DF_CHAT_LOG.Config_Title",
 			icon: 'fas fa-edit'
 		});
 	}
 
-	getData(options?: any) {
-		const data = super.getData(options);
+	/**
+	 * @param {*} [options]
+	 */
+	_prepareContext() {
 		const keys = game.journal.contents.filter(x => x.pages.contents.some(y => y.type === 'text')).map(x => x.id);
-		const selectedLog = (SETTINGS.get(DFAdventureLogConfig.PREF_JOURNAL) as string | undefined)?.split('.');
-		const selectedGMLog = (SETTINGS.get(DFAdventureLogConfig.PREF_JOURNAL_GM) as string | undefined)?.split('.');
-		let logJournals: any[] = [];
-		let logJournalPages: any[] = [];
-		let gmlogJournals: any[] = [];
-		let gmlogJournalPages: any[] = [];
+		/**@type {string|undefined}*/
+		const selectedLog = SETTINGS.get(DFAdventureLogConfig.PREF_JOURNAL)?.split('.');
+		/**@type {string|undefined}*/
+		const selectedGMLog = SETTINGS.get(DFAdventureLogConfig.PREF_JOURNAL_GM)?.split('.');
+		let logJournals = [];
+		let logJournalPages = [];
+		let gmlogJournals = [];
+		let gmlogJournalPages = [];
 		for (const key of keys) {
 			logJournals.push({
 				id: key,
@@ -75,16 +94,19 @@ export default class DFAdventureLogConfig extends FormApplication {
 		logJournals = logJournals.sort((a, b) => a.name.localeCompare(b.name));
 		gmlogJournals = gmlogJournals.sort((a, b) => a.name.localeCompare(b.name));
 
-		mergeObject(data as any, {
+		return {
 			logJournals,
 			logJournalPages,
 			gmlogJournals,
 			gmlogJournalPages
-		});
-		return data;
+		};
 	}
 
-	private fillPageList(journalId: string, element: JQuery<HTMLSelectElement>) {
+	/**
+	 * @param {string} journalId
+	 * @param {JQuery<HTMLSelectElement>} element
+	 */
+	#fillPageList(journalId, element) {
 		element.children().remove();
 		const journal = game.journal.get(journalId);
 		if (!journal) return;
@@ -93,31 +115,44 @@ export default class DFAdventureLogConfig extends FormApplication {
 		}
 	}
 
-	activateListeners(html: JQuery<HTMLElement>): void {
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		const html = $(this.element);
 		html.find('#dfal-journal').on('change', event => {
-			const journalId = (event.currentTarget as HTMLSelectElement).value;
-			const pageElement = html.find<HTMLSelectElement>('#dfal-journal-page');
-			this.fillPageList(journalId, pageElement);
+			const journalId = event.currentTarget.value;
+			const pageElement = html.find('#dfal-journal-page');
+			this.#fillPageList(journalId, pageElement);
 		});
 		html.find('#dfal-journal-gm').on('change', event => {
-			const journalId = (event.currentTarget as HTMLSelectElement).value;
-			const pageElement = html.find<HTMLSelectElement>('#dfal-journal-gm-page');
-			this.fillPageList(journalId, pageElement);
+			const journalId = event.currentTarget.value;
+			const pageElement = html.find('#dfal-journal-gm-page');
+			this.#fillPageList(journalId, pageElement);
 		});
 	}
 
-	async _updateObject(_event?: any, formData?: any) {
+	/**
+	 * @param {*} [_event]
+	 * @param {*} [formData]
+	 */
+	async _updateObject(_event, formData) {
 		const logJournal = formData['dfal-journal-page'];
 		const gmlogJournal = formData['dfal-journal-gm-page'];
 		const clear = formData['dfal-clear'];
 		const gmClear = formData['dfal-clear-gm'];
-		SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL, logJournal);
-		SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL_GM, gmlogJournal);
+		await SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL, logJournal);
+		await SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL_GM, gmlogJournal);
 		await DFAdventureLogConfig.initializeJournal(logJournal, clear, false, false);
 		await DFAdventureLogConfig.initializeJournal(gmlogJournal, gmClear, true, false);
 	}
 
-	static async initializeJournal(id: string, clear: boolean, isGMOnly: boolean, isPlayerLog: boolean) {
+	/**
+	 * @param {string} id
+	 * @param {boolean} clear
+	 * @param {boolean} isGMOnly
+	 * @param {boolean} isPlayerLog
+	 * @returns {Promise<void>}
+	 */
+	static async initializeJournal(id, clear, isGMOnly, isPlayerLog) {
 		const journalId = id?.split('.');
 		if (!journalId || journalId.length < 2 || !game.journal.has(journalId[0])) return;
 		const journal = game.journal.get(journalId[0]).pages.get(journalId[1]);
@@ -126,7 +161,7 @@ export default class DFAdventureLogConfig extends FormApplication {
 		const html = $(journal.text.content);
 		const article = html.find('article[class="df-adventure-log"]');
 		if (article.length != 0) {
-			await DFAdventureLogProcessor.resortLog();
+			await DFAdventureLogProcessor.reSortLog();
 			return;
 		}
 		await journal.update({
