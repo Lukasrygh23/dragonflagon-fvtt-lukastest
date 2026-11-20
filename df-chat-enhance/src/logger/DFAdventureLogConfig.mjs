@@ -4,20 +4,31 @@
 import SETTINGS from "../../common/Settings.mjs";
 import DFAdventureLogProcessor from "./DFAdventureLogProcessor.mjs";
 
+const ApplicationV2 = foundry.applications.api.ApplicationV2;
+const HandlebarsApplication = foundry.applications.api.HandlebarsApplicationMixin(ApplicationV2);
+const MODULE_ID = 'df-chat-enhance-lukas';
 
-export default class DFAdventureLogConfig extends FormApplication {
+export default class DFAdventureLogConfig extends HandlebarsApplication {
 	/**@readonly*/ static PREF_JOURNAL = 'log-journal';
 	/**@readonly*/ static PREF_JOURNAL_GM = 'gmlog-journal';
 	/**@readonly*/ static PREF_CONFIG = 'log-config-menu';
 
-	static get defaultOptions() {
-		return foundry.utils.mergeObject(FormApplication.defaultOptions, {
-			template: "modules/df-chat-enhance/templates/log-config.hbs",
-			resizable: false,
-			minimizable: false,
-			title: "DF_CHAT_LOG.Config_Title".localize()
-		});
-	}
+	static DEFAULT_OPTIONS = {
+		id: 'df-adventure-log-config',
+		position: { width: 500 },
+		window: { title: 'DF_CHAT_LOG.Config_Title', resizable: false, minimizable: false },
+		form: {
+			handler: async function (event, _form, formData) {
+				await this._updateObject(event, formData.object);
+			},
+			submitOnChange: false,
+			closeOnSubmit: true
+		}
+	};
+
+	static PARTS = {
+		form: { template: `modules/${MODULE_ID}/templates/log-config.hbs` }
+	};
 
 	static setupSettings() {
 		SETTINGS.register(DFAdventureLogConfig.PREF_JOURNAL, {
@@ -44,8 +55,7 @@ export default class DFAdventureLogConfig extends FormApplication {
 	/**
 	 * @param {*} [options]
 	 */
-	getData(options) {
-		const data = super.getData(options);
+	_prepareContext() {
 		const keys = game.journal.contents.filter(x => x.pages.contents.some(y => y.type === 'text')).map(x => x.id);
 		/**@type {string|undefined}*/
 		const selectedLog = SETTINGS.get(DFAdventureLogConfig.PREF_JOURNAL)?.split('.');
@@ -84,13 +94,12 @@ export default class DFAdventureLogConfig extends FormApplication {
 		logJournals = logJournals.sort((a, b) => a.name.localeCompare(b.name));
 		gmlogJournals = gmlogJournals.sort((a, b) => a.name.localeCompare(b.name));
 
-		foundry.utils.mergeObject(data, {
+		return {
 			logJournals,
 			logJournalPages,
 			gmlogJournals,
 			gmlogJournalPages
-		});
-		return data;
+		};
 	}
 
 	/**
@@ -106,8 +115,9 @@ export default class DFAdventureLogConfig extends FormApplication {
 		}
 	}
 
-	/**@param {JQuery<HTMLElement>} html*/
-	activateListeners(html) {
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		const html = $(this.element);
 		html.find('#dfal-journal').on('change', event => {
 			const journalId = event.currentTarget.value;
 			const pageElement = html.find('#dfal-journal-page');
@@ -129,8 +139,8 @@ export default class DFAdventureLogConfig extends FormApplication {
 		const gmlogJournal = formData['dfal-journal-gm-page'];
 		const clear = formData['dfal-clear'];
 		const gmClear = formData['dfal-clear-gm'];
-		SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL, logJournal);
-		SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL_GM, gmlogJournal);
+		await SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL, logJournal);
+		await SETTINGS.set(DFAdventureLogConfig.PREF_JOURNAL_GM, gmlogJournal);
 		await DFAdventureLogConfig.initializeJournal(logJournal, clear, false, false);
 		await DFAdventureLogConfig.initializeJournal(gmlogJournal, gmClear, true, false);
 	}

@@ -86,7 +86,12 @@ export default class DFAdventureLogProcessor {
 						icon: '<i data-dfce="button" class="fas fa-close"></i>',
 						callback: () => { }
 					};
-					Dialog.wait({ title: game.i18n.localize("DF_CHAT_LOG.ContextMenu.LogMessage"), buttons });
+					const dialogButtons = Object.entries(buttons).map(([action, button]) => ({ action, ...button }));
+					foundry.applications.api.DialogV2.wait({
+						window: { title: game.i18n.localize("DF_CHAT_LOG.ContextMenu.LogMessage") },
+						buttons: dialogButtons,
+						modal: true
+					});
 					return {};
 				}
 			});
@@ -319,14 +324,14 @@ export default class DFAdventureLogProcessor {
 		// If the user did not enter anything, or they entered simply 'h' or 'help', send them a help message
 		if (messageText.length == 0 || tokens.every(x => x.length == 0) || messageText.toLowerCase() == 'h' || messageText.toLowerCase() == 'help') {
 			setTimeout(async () => {
-				await Dialog.prompt({
-					title: 'DF_CHAT_LOG.HelpDialog_Title'.localize(),
-					label: 'OK',
-					callback: () => { },
-					content: await renderTemplate(`modules/df-chat-enhance/templates/lang/log-help.${'DF_CHAT_ENHANCE.LANG'.localize()}.hbs`, {
+				await foundry.applications.api.DialogV2.prompt({
+					window: { title: game.i18n.localize('DF_CHAT_LOG.HelpDialog_Title') },
+					content: await foundry.applications.handlebars.renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/lang/log-help.${'DF_CHAT_ENHANCE.LANG'.localize()}.hbs`, {
 						isGM: game.user.isGM
 					}),
-					options: { width: 800 }
+					ok: { label: 'OK' },
+					position: { width: 800 },
+					modal: true
 				});
 			}, 1);
 			return;

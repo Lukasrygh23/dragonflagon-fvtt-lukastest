@@ -22,7 +22,7 @@ export default class ChatMerge {
 	/**@type {boolean}*/ static get #_showHover() { return SETTINGS.get(this.#PREF_HOVER); }
 	/**@type {boolean}*/ static get #_showHeader() { return SETTINGS.get(this.#PREF_SHOW_HEADER); }
 
-	static init() {
+	static #registerSettings() {
 		SETTINGS.register(this.#PREF_ENABLED, {
 			name: 'DF_CHAT_MERGE.EnableName',
 			hint: 'DF_CHAT_MERGE.EnableHint',
@@ -40,7 +40,6 @@ export default class ChatMerge {
 			default: false,
 			type: Boolean,
 			onChange: (/**@type {boolean}*/newValue) => {
-				/**@type {CSSStyleDeclaration}*/
 				const style = document.querySelector(':root').style;
 				style.setProperty('--dfce-cm-header', newValue ? '' : 'none');
 				if (game.user.isGM) {
@@ -80,7 +79,6 @@ export default class ChatMerge {
 			default: false,
 			type: Boolean,
 			onChange: (/**@type {boolean}*/newValue) => {
-				/**@type {CSSStyleDeclaration}*/
 				const style = document.querySelector(':root').style;
 				style.setProperty('--dfce-cm-separation', newValue ? 'thin' : '0');
 			}
@@ -93,7 +91,6 @@ export default class ChatMerge {
 			default: true,
 			type: Boolean,
 			onChange: (/**@type {boolean}*/newValue) => {
-				/**@type {CSSStyleDeclaration}*/
 				const style = document.querySelector(':root').style;
 				newValue ? style.removeProperty('--dfce-cm-hover-shadow') : style.setProperty('--dfce-cm-hover-shadow', '0px');
 			}
@@ -105,18 +102,18 @@ export default class ChatMerge {
 			scope: 'client',
 			default: 10,
 			type: Number,
-			range: {
-				min: 1,
-				max: 60,
-				step: 1
-			},
+			range: { min: 1, max: 60, step: 1 },
 			onChange: () => this.#_processAllMessage()
 		});
+	}
 
-		libWrapperShared.register('ChatLog.prototype.deleteMessage', this.#_deleteMessage.bind(this));
-		Hooks.on("renderChatMessage", this.#_renderChatMessage);
+	static init() {
+		this.#registerSettings();
+		libWrapperShared.register('foundry.applications.sidebar.tabs.ChatLog.prototype.deleteMessage', this.#_deleteMessage.bind(this));
+		Hooks.on("renderChatMessageHTML", this.#_renderChatMessage);
 	}
 	static ready() {
+		this.#registerSettings();
 		/**@type {CSSStyleDeclaration}*/
 		const style = document.querySelector(':root').style;
 		style.setProperty('--dfce-cm-separation', this.#_separateWithBorder ? 'thin' : '0');
@@ -171,7 +168,7 @@ export default class ChatMerge {
 
 	/**@param {JQuery<HTMLElement>} [element]*/
 	static #_processAllMessage(element) {
-		element = element ?? $(document.body);
+		element = element ? $(element) : $(document.body);
 		// Remove the old CSS class designations
 		element.find('.dfce-cm-top').removeClass('dfce-cm-top');
 		element.find('.dfce-cm-middle').removeClass('dfce-cm-middle');
@@ -199,19 +196,19 @@ export default class ChatMerge {
 
 	/**
 	 * @param {ChatMessage} message
-	 * @param {JQuery<HTMLElement>} html
+	 * @param {HTMLElement} html
 	 */
 	static #_renderChatMessage(message, html) {
 		if (!ChatMerge.#_enabled) return;
 		// Find the most recent message in the chat log
-		const partnerElem = $(`#chat-log li.chat-message`).last()[0];
+		const partnerElem = document.querySelector('#chat-log li.chat-message:last-of-type');
 		// If there is no message, return
 		if (partnerElem === null || partnerElem === undefined) return;
 		// get the ChatMessage document associated with the html
 		const partner = game.messages.get(partnerElem.getAttribute('data-message-id'));
 		if (!message || !partner) return;
 		// Update styling of the chat messages
-		ChatMerge.#_styleChatMessages(message, html[0], partner, partnerElem);
+		ChatMerge.#_styleChatMessages(message, html, partner, partnerElem);
 	}
 
 	/**
@@ -246,11 +243,11 @@ export default class ChatMerge {
 				( // If BOTH actors are null and users are equal
 					!currData.speaker.actor
 					&& !prevData.speaker.actor
-					&& currData.author === prevData.author
+					&& (currData.author?.id ?? currData.author) === (prevData.author?.id ?? prevData.author)
 				);
 		} else {
 			// If we are not splitting by speaker, just do the simple option of comparing the users
-			userCompare = currData.author === prevData.author;
+			userCompare = (currData.author?.id ?? currData.author) === (prevData.author?.id ?? prevData.author);
 		}
 
 		const currIsRoll = (currData.rolls ?? []).length > 0;

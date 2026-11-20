@@ -36,10 +36,11 @@ export default class ChatHistoryOptimizer {
 
 		if (!SETTINGS.get(this.PREF_ENABLED)) return;
 
-		libWrapper.register(SETTINGS.MOD_NAME, "ChatLog.prototype.isAtBottom", function() { return this._isAtBottom; }, "OVERRIDE");
+		libWrapper.register(SETTINGS.MOD_NAME, "foundry.applications.sidebar.tabs.ChatLog.prototype.isAtBottom", function(wrapped) { return this._isAtBottom ?? wrapped(); }, "MIXED");
 
 		Hooks.on('renderChatLog', (/**@type {ChatLog}*/app, /**@type {JQuery}*/ html) => {
-			html.find("#chat-log").off().on("scroll", this.ChatLog_onScrollLog.bind(app));
+			const root = html instanceof HTMLElement ? html : html?.[0];
+			root?.querySelector('#chat-log')?.addEventListener('scroll', this.ChatLog_onScrollLog.bind(app));
 /* DEBUG *
 			// This is used for DEBUG purposes only
 			// Displays the number of messages being rendered in the Chat Log
@@ -59,21 +60,22 @@ export default class ChatHistoryOptimizer {
 	 */
 	static ChatLog_onScrollLog(event, force = false) {
 		if (!this.rendered) return Promise.resolve();
-		// If this variable is not set, we need to allow the original script to run
 		if (!this._scrollToBottomButton) {
-			this._scrollToBottomButton = this.element.find(".jump-to-bottom")[0];
-			return this._onScrollLog(event);
+			this._scrollToBottomButton = this.element.querySelector('.jump-to-bottom');
 		}
+		if (!this._scrollToBottomButton) return Promise.resolve();
 		
-		/**@type {HTMLElement}*/const log = event.target;
+		const log = event?.target;
+		if (!log || typeof log.scrollTop !== 'number' || typeof log.scrollHeight !== 'number') return Promise.resolve();
 		const pct = log.scrollTop / (log.scrollHeight - log.clientHeight);
 		this._isAtBottom = (pct > 0.99) || Number.isNaN(pct);
-		this._scrollToBottomButton[0].classList.toggle("hidden", this._isAtBottom);
+		this._scrollToBottomButton.classList.toggle("hidden", this._isAtBottom);
 
 		const maxMessageCount = SETTINGS.get(ChatHistoryOptimizer.PREF_HISTORY_SIZE);
 		// Ignore all scroll events when there are not enough messages to even batch
 		if (!force && this.collection.size <= CONFIG.ChatMessage.batchSize) return;
 		const messages = $(log).find('li.chat-message');
+		if (!messages.length) return Promise.resolve();
 		// Grab the top most message based on current scroll position
 		let topMessageIndex = -1;
 

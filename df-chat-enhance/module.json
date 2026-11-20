@@ -1,10 +1,10 @@
 {
-	"id": "df-chat-enhance",
-	"title": "DF Chat Enhancements",
+	"id": "df-chat-enhance-lukas",
+	"title": "DF Chat Enhancements Lukas",
 	"description": "Various enhancements to the chat features.",
-	"version": "5.1.0",
+	"version": "5.1.23",
 	"authors": [ { "name": "flamewave000", "discord": "flamewave000", "url": "https://github.com/flamewave000" } ],
-	"compatibility": { "minimum": 12, "verified": 12.331 },
+	"compatibility": { "minimum": 13, "verified": 13.351 },
 	"relationships": {
 		"requires": [
 			{
@@ -31,10 +31,10 @@
 		{ "lang": "ko", "name": "한국어", "path": "lang/ko.json" },
 		{ "lang": "ja", "name": "日本語", "path": "lang/ja.json" }
 	],
-	"url":		"https://dragonflagon.cafe/mods/url/df-chat-enhance",
+	"url":		"https://github.com/Lukasrygh23/dragonflagon-fvtt-lukastest",
 	"license":	"https://dragonflagon.cafe/mods/lic/df-chat-enhance",
-	"manifest":	"https://dragonflagon.cafe/mods/man/df-chat-enhance",
-	"download":	"https://dragonflagon.cafe/mods/pak/df-chat-enhance",
+	"manifest":	"https://github.com/Lukasrygh23/dragonflagon-fvtt-lukastest/releases/download/v13/module.json",
+	"download":	"https://github.com/Lukasrygh23/dragonflagon-fvtt-lukastest/releases/download/v13/df-chat-enhance-lukas.zip",
 	"readme":	"https://dragonflagon.cafe/mods/doc/df-chat-enhance",
 	"changelog":"https://dragonflagon.cafe/mods/chg/df-chat-enhance",
 	"bugs":		"https://dragonflagon.cafe/mods/bug/df-chat-enhance",

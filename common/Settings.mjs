@@ -24,6 +24,9 @@
 
 export default class SETTINGS {
 	static MOD_NAME;
+	static SHARED_ALIASES = {
+		'df-chat-enhance-lukas': 'df-chat-enhance'
+	};
 	/** @param {string} moduleName */
 	static init(moduleName) {
 		this.MOD_NAME = moduleName;
@@ -37,26 +40,38 @@ export default class SETTINGS {
 	 * @param {string} key
 	 * @param {SettingsConfig<*>} config
 	 */
-	static register(key, config) { game.settings.register(SETTINGS.MOD_NAME, key, config); }
+	static getEffectiveModuleName(moduleName = SETTINGS.MOD_NAME) {
+		const alias = this.SHARED_ALIASES[moduleName];
+		return alias && game.modules?.get(alias)?.active ? alias : moduleName;
+	}
+	static register(key, config, moduleName = SETTINGS.MOD_NAME) {
+		const owner = this.getEffectiveModuleName(moduleName);
+		if (owner !== moduleName || game.settings.settings.has(`${owner}.${key}`)) return;
+		game.settings.register(owner, key, config);
+	}
 	/**
 	 * @param {string} key
 	 * @param {SettingSubmenuConfig} config
 	 */
-	static registerMenu(key, config) { game.settings.registerMenu(SETTINGS.MOD_NAME, key, config); }
+	static registerMenu(key, config, moduleName = SETTINGS.MOD_NAME) {
+		const owner = this.getEffectiveModuleName(moduleName);
+		if (owner !== moduleName || game.settings.menus.has(`${owner}.${key}`)) return;
+		game.settings.registerMenu(owner, key, config);
+	}
 	/**
 	 * @param {string} key
 	 * @returns {any}
 	 */
-	static get(key) { return game.settings.get(SETTINGS.MOD_NAME, key); }
+	static get(key, moduleName = SETTINGS.MOD_NAME) { return game.settings.get(this.getEffectiveModuleName(moduleName), key); }
 	/**
 	 * @param {string} key
 	 * @param {any} value
 	 * @returns {Promise<any>}
 	 */
-	static async set(key, value) { return await game.settings.set(SETTINGS.MOD_NAME, key, value); }
+	static async set(key, value, moduleName = SETTINGS.MOD_NAME) { return await game.settings.set(this.getEffectiveModuleName(moduleName), key, value); }
 	/**
 	 * @param {string} key
 	 * @returns {any}
 	 */
-	static default(key) { return game.settings.settings.get((SETTINGS.MOD_NAME + '.' + key)).default; }
+	static default(key, moduleName = SETTINGS.MOD_NAME) { return game.settings.settings.get(`${this.getEffectiveModuleName(moduleName)}.${key}`).default; }
 }

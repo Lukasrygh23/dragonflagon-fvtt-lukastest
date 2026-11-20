@@ -13,12 +13,7 @@ export default class ChatTime {
 	/**@type {boolean}*/
 	static get #simpleCalendarActive() { return !!game.modules.get('foundryvtt-simple-calendar')?.active; }
 
-	static ready() {
-		if (!this.#simpleCalendarActive && game.user.isGM && this.#enabled)
-			ui.notifications.warn('DF_CHAT_TIME.ErrorSimpleCalendarMissing', { permanent: true, localize: true });
-	}
-
-	static init() {
+	static #registerSettings() {
 		SETTINGS.register(this.#PREF_ENABLED, {
 			scope: 'world',
 			type: Boolean,
@@ -38,6 +33,16 @@ export default class ChatTime {
 			config: this.#simpleCalendarActive,
 			onChange: UTIL.reloadChatLog
 		});
+	}
+
+	static ready() {
+		this.#registerSettings();
+		if (!this.#simpleCalendarActive && game.user.isGM && this.#enabled)
+			ui.notifications.warn('DF_CHAT_TIME.ErrorSimpleCalendarMissing', { permanent: true, localize: true });
+	}
+
+	static init() {
+		this.#registerSettings();
 
 		libWrapper.register(SETTINGS.MOD_NAME, 'ChatMessage.implementation.create',
 			/**
@@ -53,35 +58,33 @@ export default class ChatTime {
 				return wrapped(foundry.utils.mergeObject(chatData, data), createOptions);
 			}, 'WRAPPER');
 
-		if (!game.dnd5e)
-			Hooks.on('renderChatMessage', this.renderChatMessage);
-		else
-			Hooks.on('dnd5e.renderChatMessage', this.renderChatMessage);
+		Hooks.on('renderChatMessageHTML', this.renderChatMessage);
 	}
 	/**
 	* @param {ChatMessage} message
-	* @param {JQuery<HTMLElement> | HTMLElement} html
+	* @param {HTMLElement} html
 	* @param {any} _data
 	* @returns {void}
 	*/
 	static renderChatMessage(message, html, _data) {
 		const time = new Date(message.timestamp).toLocaleString(navigator.language.startsWith('en') ? 'en-CA' : navigator.language);
-		/**@type {JQuery<HTMLElement>}*/
-		const element = $(html);
+		const timeElement = html.querySelector('.message-timestamp');
+		if (!timeElement) return;
 		if (ChatTime.#simpleCalendarActive && ChatTime.#enabled) {
 			/**@type {number}*/
 			const simpleTimestamp = message.getFlag(SETTINGS.MOD_NAME, ChatTime.#FLAG_CHAT_TIME);
 			if (simpleTimestamp !== undefined) {
-				const timeElement = element.find('.message-timestamp');
-				const simpleTimeElement = $(`<time class="dfce-simple-timestamp">${SimpleCalendar.api.formatDateTime(
+				const simpleTimeElement = document.createElement('time');
+				simpleTimeElement.className = 'dfce-simple-timestamp';
+				simpleTimeElement.textContent = SimpleCalendar.api.formatDateTime(
 					SimpleCalendar.api.timestampToDate(simpleTimestamp), SETTINGS.get(ChatTime.#PREF_FORMAT)
-				)}</time>`);
+				);
+				simpleTimeElement.dataset.tooltip = time;
 				timeElement.after(simpleTimeElement);
-				timeElement.hide();
-				simpleTimeElement[0].dataset.tooltip = time;
+				timeElement.hidden = true;
 				return;
 			}
 		}
-		element.find(".message-timestamp")[0].dataset.tooltip = time;
+		timeElement.dataset.tooltip = time;
 	}
 }

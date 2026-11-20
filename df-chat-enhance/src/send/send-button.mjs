@@ -36,6 +36,7 @@ export default class SendButton {
 	 */
 	static #_renderChatLog(app, html) {
 		if (!SETTINGS.get(this.#PREF_ENABLED)) return;
+		html = $(html);
 		const sendButton = $('<button class="dfce-send-btn"><i class="fas fa-paper-plane"></i></button>');
 		sendButton.attr('title', 'DF_CHAT_SEND_BUTTON.ButtonTitle'.localize());
 		html.find('#chat-form').append(sendButton);
@@ -45,16 +46,11 @@ export default class SendButton {
 
 		sendButton.on('click', async event => {
 			event.preventDefault();
-			await ui.chat._onChatKeyDown({
-				code: 'Enter',
-				currentTarget: textarea[0],
-				originalEvent: {
-					isComposing: false
-				},
-				preventDefault: () => { },
-				stopPropagation: () => { }
-			});
-			setTimeout(() => textarea.trigger('input'), 100);
+			const message = textarea.val()?.toString() ?? '';
+			if (!message.trim()) return;
+			await ui.chat.processMessage(message);
+			textarea.val('');
+			textarea.trigger('input');
 		});
 
 		/**@type {(event: JQuery.TriggeredEvent<HTMLTextAreaElement, undefined, HTMLTextAreaElement, HTMLTextAreaElement>) => void}*/

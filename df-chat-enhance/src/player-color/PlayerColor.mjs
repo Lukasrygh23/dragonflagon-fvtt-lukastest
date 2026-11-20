@@ -69,46 +69,39 @@ export default class PlayerColor {
 				return wrapped(event, form, formData);
 			});
 
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatMessage.prototype.getHTML', this.#ChatMessage_getHTML, 'WRAPPER');
+		Hooks.on('renderChatMessageHTML', this.#renderChatMessageHTML);
 	}
 
-	/**
-	* @this {ChatMessage}
-	* @param {(...arg: any) => Promise<JQuery<HTMLElement>>} wrapper
-	* @param  {...any} args
-	* @returns {Promise<JQuery<HTMLElement>>}
-	*/
-	static async #ChatMessage_getHTML(wrapper, ...args) {
-		const html = await wrapper(...args);
+	static #renderChatMessageHTML(message, html) {
 		const STYLE = SETTINGS.get(PlayerColor.#PREF_BORDER_STYLE);
 		// If the message has no user bound to it, then it is likely some kind of other message being created by a module. Just return immediately.
 		// Also ignore whispers and rolls
-		if (!this.author) return html;
-		let chatColor = this.author.getFlag(SETTINGS.MOD_NAME, PlayerColor.#FLAG_CHAT_COLOR)?.trim();
+		const author = typeof message.author === 'string' ? game.users.get(message.author) : message.author;
+		if (!author) return;
+		let chatColor = author.getFlag(SETTINGS.MOD_NAME, PlayerColor.#FLAG_CHAT_COLOR)?.trim();
 		// If it is a valid color
 		if (!chatColor || !/#[a-fA-F0-9]{6,8}/.test(chatColor))
-			chatColor = this.author.color;
+			chatColor = author.color;
 
 		// Set the border colour to its default
 		let borderColour = '#6f6c66';
 		switch (STYLE) {
 			case 'none': break;
-			case 'mine': if (game.userId !== this.author.id) break;
+			case 'mine': if (game.userId !== author.id) break;
 			/** @fallthrough */
 			case 'all': borderColour = chatColor; break;
 		}
-		html[0].style.borderColor = borderColour;
+		html.style.borderColor = borderColour;
 
 		// Set the hover border colour to what ever the border colour is
-		html[0].style.setProperty('--dfce-mc-border-color', borderColour);
-		if (!this.isRoll && this.whisper.length == 0 && SETTINGS.get(PlayerColor.#PREF_TINT_BG)) {
-			html[0].style.backgroundColor = chatColor;
-			html[0].style.backgroundBlendMode = 'screen';
+		html.style.setProperty('--dfce-mc-border-color', borderColour);
+		if (!message.isRoll && (message.whisper ?? []).length === 0 && SETTINGS.get(PlayerColor.#PREF_TINT_BG)) {
+			html.style.backgroundColor = chatColor;
+			html.style.backgroundBlendMode = 'screen';
 			if (!!game.dnd5e) {
-				html[0].style.backgroundImage = 'url(../ui/parchment.jpg)';
-				html[0].style.backgroundRepeat = 'repeat';
+				html.style.backgroundImage = 'url(../ui/parchment.jpg)';
+				html.style.backgroundRepeat = 'repeat';
 			}
 		}
-		return html;
 	}
 }

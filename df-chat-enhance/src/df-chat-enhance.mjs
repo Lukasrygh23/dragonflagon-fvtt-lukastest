@@ -14,16 +14,18 @@ import PlayerColor from './player-color/PlayerColor.mjs';
 import SendButton from "./send/send-button.mjs";
 import FontSizePatch from "./font-size/font-size.mjs";
 import ChatTime from "./chat-time/chat-time.mjs";
-SETTINGS.init('df-chat-enhance');
+SETTINGS.init('df-chat-enhance-lukas');
 
-Application.prototype._recalculateDimensions = function () {
-	this.element[0].style.height = '';
-	this.element[0].style.width = '';
-	this.setPosition({});
-};
+function runFeaturePhase(phase, name, callback) {
+	try {
+		callback();
+	} catch (error) {
+		console.error(`[${SETTINGS.MOD_NAME}] ${name} ${phase} failed`, error);
+	}
+}
 
 Hooks.once('setup', function () {
-	ChatRollPrivacy.setup();
+	runFeaturePhase('setup', 'Chat privacy', () => ChatRollPrivacy.setup());
 });
 
 Hooks.once('init', function () {
@@ -32,18 +34,19 @@ Hooks.once('init', function () {
 	 * chat window, while the privacy changes those buttons
 	 * from <a> tags to <button> tags if enabled.
 	 */
-	DFChatArchive.init();
-	ChatRollPrivacy.init();
-	DFAdventureLog.init();
-	ChatMerge.init();
-	ScrollManage.init();
-	WhisperTruncation.init();
-	PlayerColor.init();
-	SendButton.init();
-	FontSizePatch.init();
-	ChatTime.init();
+	runFeaturePhase('init', 'Chat archives', () => DFChatArchive.init());
+	runFeaturePhase('init', 'Chat privacy', () => ChatRollPrivacy.init());
+	runFeaturePhase('init', 'Adventure Log', () => DFAdventureLog.init());
+	runFeaturePhase('init', 'Chat Merge', () => ChatMerge.init());
+	runFeaturePhase('init', 'Scroll management', () => ScrollManage.init());
+	runFeaturePhase('init', 'Whisper truncation', () => WhisperTruncation.init());
+	runFeaturePhase('init', 'Player colors', () => PlayerColor.init());
+	runFeaturePhase('init', 'Send button', () => SendButton.init());
+	runFeaturePhase('init', 'Font size', () => FontSizePatch.init());
+	runFeaturePhase('init', 'Chat time', () => ChatTime.init());
 
-	libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype._getEntryContextOptions',
+	const chatLog = foundry.applications.sidebar.tabs.ChatLog;
+	if (typeof chatLog?.prototype?._getEntryContextOptions === 'function') runFeaturePhase('init', 'Chat context menu', () => libWrapper.register(SETTINGS.MOD_NAME, 'foundry.applications.sidebar.tabs.ChatLog.prototype._getEntryContextOptions',
 		/**
 		 * @param {(...args: any) => ContextMenuEntry[]} wrapped
 		 * @param  {...any} args
@@ -54,7 +57,7 @@ Hooks.once('init', function () {
 			DFChatEdit.appendChatContextMenuOptions(options);
 			DFAdventureLogProcessor.appendChatContextMenuOptions(options);
 			return options;
-		}, 'WRAPPER');
+		}, 'WRAPPER'));
 });
 
 Hooks.once('ready', function () {
@@ -63,9 +66,9 @@ Hooks.once('ready', function () {
 		if (game.user.isGM)
 			ui.notifications.error('DF_CHAT_LOG.Error.LibWrapperMissing'.localize());
 	}
-	DFAdventureLog.ready();
-	DFChatEdit.ready();
-	ChatMerge.ready();
-	ScrollManage.ready();
-	ChatTime.ready();
+	runFeaturePhase('ready', 'Adventure Log', () => DFAdventureLog.ready());
+	runFeaturePhase('ready', 'Chat edit', () => DFChatEdit.ready());
+	runFeaturePhase('ready', 'Chat Merge', () => ChatMerge.ready());
+	runFeaturePhase('ready', 'Scroll management', () => ScrollManage.ready());
+	runFeaturePhase('ready', 'Chat time', () => ChatTime.ready());
 });

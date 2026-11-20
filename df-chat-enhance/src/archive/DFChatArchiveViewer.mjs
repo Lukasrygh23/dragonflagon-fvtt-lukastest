@@ -1,225 +1,196 @@
-/// <reference path="../../../fvtt-scripts/foundry.js" />
-/// <reference path="./types.d.ts" />
 import { DFChatArchive } from './DFChatArchive.mjs';
-import ChatTime from '../chat-time/chat-time.mjs';
 
-export default class DFChatArchiveViewer extends Application {
-	/**@type {DFChatArchiveEntry}*/ archive;
-	/**@type {ChatMessage[]}*/ messages;
-	/**@type {(view: DFChatArchiveViewer) => void}*/ onCloseCallBack;
-	/**
-	 * @param {DFChatArchiveEntry} archive
-	 * @param {(view: DFChatArchiveViewer) => void} onCloseCallBack
-	 */
+const ApplicationV2 = foundry.applications.api.ApplicationV2;
+const HandlebarsApplication = foundry.applications.api.HandlebarsApplicationMixin(ApplicationV2);
+const DialogV2 = foundry.applications.api.DialogV2;
+const MODULE_ID = 'df-chat-enhance-lukas';
+const escapeHTML = value => String(value).replace(/[&<>"']/g, character => ({
+	'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[character]);
+
+export default class DFChatArchiveViewer extends HandlebarsApplication {
+	archive;
+	messages = [];
+	onCloseCallBack;
+	_deletedMessageIds = new Set();
+
+	static DEFAULT_OPTIONS = {
+		id: 'df-chat-archive-viewer',
+		classes: ['df-chat-log-window'],
+		position: { width: 300, height: 500 },
+		window: { title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Title', resizable: true }
+	};
+
+	static PARTS = {
+		body: {
+			template: `modules/${MODULE_ID}/templates/archive-viewer.hbs`,
+			scrollable: ['']
+		}
+	};
+
 	constructor(archive, onCloseCallBack) {
-		super();
+		super({ id: `df-chat-archive-viewer-${archive.id}` });
 		this.archive = archive;
 		this.onCloseCallBack = onCloseCallBack;
 	}
 
-	/**@type {ApplicationOptions}*/
-	static get defaultOptions() {
-		return foundry.utils.mergeObject(Application.defaultOptions, {
-			template: "modules/df-chat-enhance/templates/archive-viewer.hbs",
-			width: 300,
-			height: 500,
-			resizable: true,
-			title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Title',
-			classes: ['df-chat-log-window']
-		});
-	}
-
-	getData(options = {}) {
-		super.getData(options);
+	async _prepareContext() {
 		return {
 			name: this.archive.name,
 			isGM: game.user.isGM,
 			visible: this.archive.visible ?? false,
-			logId: 'df-chat-log-' + this.archive.id
+			logId: `df-chat-log-${this.archive.id}`
 		};
 	}
 
-	/**
-	 * @param {*} data
-	 * @returns {Promise<JQuery>}
-	 */
-	_renderInner(data) {
-		return super._renderInner(data)
-			.then(async (/**@type {JQuery<HTMLElement>}*/ html) => {
-				html.find("#visible-df-chat-log-" + this.archive.id).on('change', async (element) => {
-					this.archive.visible = element.target.checked;
-					await DFChatArchive.updateChatArchive(this.archive);
-				});
-				html.find("#edit").on('click', async () => {
-					setTimeout(async () => {
-						const dialog = new Dialog({
-							title: "DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Title".localize(),
-							content: `<input id="name" type="text" value="${this.archive.name}"/>`,
-							buttons: {
-								save: {
-									icon: '<i class="fas fa-save"></i>',
-									label: 'DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Save'.localize(),
-									callback: async (html) => {
-										this.archive.name = $(html).find('#name').val();
-										await dialog.close();
-										await DFChatArchive.updateChatArchive(this.archive);
-										await this.render(false);
-									}
-								},
-								close: {
-									icon: '<i class="fas fa-times"></i>',
-									label: 'DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Cancel'.localize(),
-									callback: async () => {
-										await dialog.close();
-									}
-								}
-							},
-							default: 'save'
-						});
-						dialog.render(true);
-					}, 1);
-				});
-				html.find('#print').on('click', async () => {
-					const clone = html.find('#df-chat-log').clone();
-					clone.addClass('df-chat-print');
-					$('body').hide();
-					$('html').addClass('df-chat-print');
-					$('html').append(clone);
-					window.print();
-					clone.remove();
-					$('html').removeClass('df-chat-print');
-					$('body').show();
-				});
-				html.find('#merge').on('click', async () => {
-					if (DFChatArchive.getLogs().length == 1) {
-						ui.notifications.info('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_OnlyOneArchive'.localize());
-						return;
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		const root = this.element;
+		const html = $(root);
+
+		html.find(`#visible-df-chat-log-${this.archive.id}`).on('change', async event => {
+			this.archive.visible = event.currentTarget.checked;
+			await DFChatArchive.updateChatArchive(this.archive);
+		});
+		html.find('#edit').on('click', () => this._editArchiveName());
+		html.find('#print').on('click', () => this._printArchive(root));
+		html.find('#merge').on('click', () => this._mergeArchive());
+		html.find('#html').on('click', () => this._downloadHTML(root));
+
+		const log = html.find('#df-chat-log');
+		const entries = await DFChatArchive.getArchiveContents(this.archive);
+		this.messages = entries.map(message => {
+			const data = message?.toJSON ? message.toJSON() : { ...message };
+			const author = data.author ?? data._source?.author ?? data.user;
+			data.author = typeof author === 'string' ? author : author?.id;
+			delete data.user;
+			return data;
+		}).filter(message => game.user.isGM
+			|| message.author === game.userId
+			|| message.type !== CONST.CHAT_MESSAGE_TYPES.WHISPER
+			|| (message.whisper ?? []).includes(game.userId));
+
+		const deletionIds = new Set();
+		const saveChanges = html.find('#dfal-save-changes');
+		for (const data of this.messages) {
+			const chatMessage = new ChatMessage(data);
+			try {
+				const rendered = await foundry.applications.sidebar.tabs.ChatLog.renderMessage(chatMessage);
+				const deleteButton = rendered.querySelector('a.message-delete');
+				if (this.messages.length === 1 && deleteButton) deleteButton.hidden = true;
+				deleteButton?.addEventListener('click', event => {
+					event.preventDefault();
+					const message = deleteButton.closest('li.chat-message');
+					const id = message?.dataset.messageId;
+					if (!id) return;
+					if (deletionIds.has(id)) {
+						deletionIds.delete(id);
+						message.classList.remove('dfal-deleted');
+						deleteButton.querySelector('i')?.classList.replace('fa-redo-alt', 'fa-trash');
+					} else {
+						deletionIds.add(id);
+						message.classList.add('dfal-deleted');
+						deleteButton.querySelector('i')?.classList.replace('fa-trash', 'fa-redo-alt');
 					}
-					const dialog = new Dialog({
-						title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Title'.localize(),
-						default: 'merge',
-						content: await renderTemplate('modules/df-chat-enhance/templates/archive-merge.hbs', {
-							id: this.archive.id,
-							name: this.archive.name,
-							archives: DFChatArchive.getLogs().filter(x => x.id != this.archive.id)
-						}),
-						buttons: {
-							cancel: {
-								icon: '<i class="fas fa-times"></i>',
-								label: 'DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Cancel'.localize(),
-								callback: async () => await dialog.close()
-							},
-							merge: {
-								icon: '<i class="fas fa-sitemap"></i>',
-								label: 'DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Merge'.localize(),
-								callback: async (html) => {
-									/**@type {string}*/
-									const val = $(html).find('#archive').val();
-									if (isNaN(parseInt(val))) return;
-									const id = parseInt(val);
-									const source = DFChatArchive.getLogs().find(x => x.id == id);
-									const currentChats = await DFChatArchive.getArchiveContents(this.archive);
-									const sourceChats = await DFChatArchive.getArchiveContents(source);
-									/**@type {ChatMessage[]}*/
-									const mergedChats = currentChats
-										.concat(sourceChats)
-										.sort((a, b) => a.timestamp - b.timestamp);
-									await DFChatArchive.updateChatArchive(this.archive, mergedChats);
-									this.render(true);
-									if (($(html).find('#delete-' + this.archive.id)[0]).checked) {
-										await DFChatArchive.deleteChatArchive(id);
-									}
-								}
-							}
-						}
-					});
-					await dialog.render(true);
+					saveChanges.toggle(deletionIds.size > 0);
 				});
+				log[0].append(rendered);
+			} catch (error) {
+				console.error(`Chat message ${chatMessage.id} failed to render.\n${error}`);
+			}
+		}
 
-				html.find('#html').on('click', () => {
-					const data = $('<div></div>').append(html.find('#df-chat-log').clone()).html();
-					const anchor = document.createElement('a');
-					anchor.download = encodeURI(this.archive.name) + '.html';
-					// anchor.href = "data:text/html;base64," + btoa(unescape(encodeURIComponent(data)));
-					anchor.href = "data:text/html," + encodeURIComponent(data);
-					anchor.click();
-				});
-
-				const log = html.find('#df-chat-log');
-				const messageHtml = [];
-				/**@type {ChatMessage[]}*/
-				this.messages = await DFChatArchive.getArchiveContents(this.archive);
-				this.messages = this.messages.filter(x => game.user.isGM || x.author.id === game.userId || x.whisper.length == 0 || x.whisper.some(x => x === game.userId));
-
-				/**@type {string[]}*/
-				const deletionList = [];
-				const deleteButton = html.find('#dfal-save-changes');
-				for (const value of this.messages) {
-					const chatMessage = value instanceof ChatMessage ? value : new ChatMessage(value);
-					try {
-						/**@type {JQuery<HTMLElement>}*/
-						const html = await chatMessage.getHTML();
-						ChatTime.renderChatMessage(chatMessage, html);
-						const deleteButton = html.find('a.message-delete');
-						// if we only have 1 message, don't allow it to be deleted. They might as well just delete the archive
-						if (this.messages.length == 1)
-							deleteButton.hide();
-						deleteButton.on('click', (/**@type {JQuery.ClickEvent}*/event) => {
-								const messageHtml = $(event.target.parentElement?.parentElement?.parentElement?.parentElement);
-								const buttonIcon = $(event.target);
-								if (messageHtml.hasClass('dfal-deleted')) {
-									messageHtml.removeClass('dfal-deleted');
-									buttonIcon.removeClass('fa-redo-alt');
-									buttonIcon.addClass('fa-trash');
-									deletionList.splice(deletionList.findIndex(x => x === messageHtml.attr('data-message-id')), 1);
-								} else {
-									messageHtml.addClass('dfal-deleted');
-									buttonIcon.removeClass('fa-trash');
-									buttonIcon.addClass('fa-redo-alt');
-									deletionList.push(messageHtml.attr('data-message-id'));
-								}
-								if (deletionList.length > 0) deleteButton.show();
-								else deleteButton.hide();
-							});
-						messageHtml.push(html);
-					} catch (err) {
-						console.error(`Chat message ${chatMessage.id} failed to render.\n${err})`);
-					}
-				}
-
-				// Prepend the HTML
-				log.prepend(messageHtml);
-
-				deleteButton.hide();
-				deleteButton.on('click', async () => {
-					if (deletionList.length === this.messages.length) {
-						ui.notifications.warn('DF_CHAT_ARCHIVE.ArchiveViewer_Error_Delete_All'.localize());
-						return;
-					}
-					Dialog.confirm({
-						title: "DF_CHAT_ARCHIVE.ArchiveViewer_DeleteTitle".localize(),
-						content: "DF_CHAT_ARCHIVE.ArchiveViewer_DeleteContent".localize(),
-						defaultYes: false,
-						yes: async () => {
-							for (const id of deletionList) {
-								const message = html.find(`li[data-message-id="${id}"]`);
-								message.hide(500, () => message.remove());
-							}
-							this.messages = this.messages.filter(x => !deletionList.includes(x._id));
-							await DFChatArchive.updateChatArchive(this.archive, this.messages);
-						}
-					});
-				});
-
-				return html;
+		saveChanges.hide().on('click', async event => {
+			event.preventDefault();
+			if (deletionIds.size >= this.messages.length) {
+				ui.notifications.warn(game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Error_Delete_All'));
+				return;
+			}
+			const confirmed = await DialogV2.confirm({
+				window: { title: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_DeleteTitle') },
+				content: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_DeleteContent'),
+				modal: true
 			});
+			if (!confirmed) return;
+			for (const id of deletionIds) html.find(`li[data-message-id="${CSS.escape(id)}"]`).remove();
+			this.messages = this.messages.filter(message => !deletionIds.has(message._id));
+			await DFChatArchive.updateChatArchive(this.archive, this.messages);
+		});
 	}
-	/**
-	 * @param {object} [options]
-	 * @returns {Promise<void>}
-	 */
-	close(options) {
+
+	async _editArchiveName() {
+		const result = await DialogV2.input({
+			window: { title: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Title') },
+			content: `<label>${game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Title')}<input name="name" type="text" value="${escapeHTML(this.archive.name)}" autofocus></label>`,
+			ok: { label: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Save') },
+			modal: true
+		});
+		if (!result?.name?.trim()) return;
+		this.archive.name = result.name.trim();
+		await DFChatArchive.updateChatArchive(this.archive);
+		await this.render({ force: true });
+	}
+
+	async _mergeArchive() {
+		const archives = DFChatArchive.getLogs().filter(entry => entry.id !== this.archive.id);
+		if (archives.length === 0) {
+			ui.notifications.info(game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_OnlyOneArchive'));
+			return;
+		}
+		const options = archives.map(entry => `<option value="${entry.id}">${escapeHTML(entry.name)}</option>`).join('');
+		const result = await DialogV2.input({
+			window: { title: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Title') },
+			content: `<label>${game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Title')}<select name="archive">${options}</select></label><label><input name="delete" type="checkbox">Delete source archive</label>`,
+			ok: { label: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Merge') },
+			modal: true
+		});
+		if (!result?.archive) return;
+		const source = DFChatArchive.getArchive(Number.parseInt(result.archive, 10));
+		if (!source) return;
+		const currentChats = await DFChatArchive.getArchiveContents(this.archive);
+		const sourceChats = await DFChatArchive.getArchiveContents(source);
+		await DFChatArchive.updateChatArchive(this.archive, [...currentChats, ...sourceChats].sort((a, b) => a.timestamp - b.timestamp));
+		if (result.delete) await DFChatArchive.deleteChatArchive(source.id);
+		await this.render({ force: true });
+	}
+
+	_downloadHTML(root) {
+		const content = root.querySelector('#df-chat-log')?.cloneNode(true);
+		if (!content) return;
+		const anchor = document.createElement('a');
+		anchor.download = `${encodeURI(this.archive.name)}.html`;
+		anchor.href = `data:text/html,${encodeURIComponent(content.outerHTML)}`;
+		anchor.click();
+	}
+
+	_printArchive(root) {
+		const frame = document.createElement('iframe');
+		frame.setAttribute('aria-hidden', 'true');
+		Object.assign(frame.style, { position: 'fixed', width: '1px', height: '1px', left: '-10000px', border: '0' });
+		document.body.appendChild(frame);
+		const printDocument = frame.contentDocument;
+		if (!printDocument) {
+			frame.remove();
+			ui.notifications.warn('Unable to prepare archive for printing.');
+			return;
+		}
+		const styles = [...document.querySelectorAll('link[rel="stylesheet"], style')]
+			.map(style => style.outerHTML).join('');
+		printDocument.open();
+		printDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title></title>${styles}<style>@media print { body { margin: 0; background: #fff; color: #111; } #df-chat-log { display: block !important; height: auto !important; overflow: visible !important; } }</style></head><body></body></html>`);
+		printDocument.close();
+		printDocument.title = this.archive.name;
+		const log = root.querySelector('#df-chat-log')?.cloneNode(true);
+		if (!log) { frame.remove(); return; }
+		printDocument.body.appendChild(log);
+		const cleanup = () => frame.remove();
+		frame.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
+		frame.contentWindow?.requestAnimationFrame(() => frame.contentWindow?.print());
+		window.setTimeout(cleanup, 30000);
+	}
+
+	_onClose(options) {
 		this.onCloseCallBack(this);
-		return super.close(options);
+		super._onClose(options);
 	}
 }

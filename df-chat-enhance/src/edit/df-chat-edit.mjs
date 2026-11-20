@@ -53,25 +53,23 @@ export default class DFChatEdit {
 			scope: 'world'
 		});
 
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype._onChatKeyDown', (/**@type {()=>void}*/wrapper, ...args) => {
-			/**@type {KeyboardEvent}*/
-			const event = args[0];
-			// We have used the Shift+Up combo to edit previously sent message
-			if (event.code === "ArrowUp" && event.ctrlKey) {
+		Hooks.on('renderChatLog', (_app, html) => {
+			const root = html instanceof HTMLElement ? html : html?.[0];
+			const input = root?.querySelector('#chat-message, textarea[name="message"]');
+			if (!input || input.dataset.dfEditShortcutBound) return;
+			input.dataset.dfEditShortcutBound = 'true';
+			input.addEventListener('keydown', event => {
+				if (event.code !== 'ArrowUp' || !event.ctrlKey) return;
 				event.preventDefault();
-				/**@type {ChatMessage[]}*/
-				let messages = [...(ui.chat.collection.values())];
-				// Perform an inverted sort ( n<0 before, n=0 same, n>0 after )
-				messages = messages.sort((a, b) => b.timestamp - a.timestamp);
-				const message = messages.find(x => x.author === game.user.id);
-				if (!message) return;
-				DFChatEdit.editChatMessage.bind(message)();
-			}
-			else
-				wrapper(...args);
-		}, 'MIXED');
+				const message = [...ui.chat.collection.values()]
+					.sort((a, b) => b.timestamp - a.timestamp)
+					.find(candidate => (candidate.author?.id ?? candidate.author) === game.userId);
+				if (message) DFChatEdit.editChatMessage.bind(message)();
+			});
+		});
 
-		libWrapper.register(SETTINGS.MOD_NAME, 'ChatLog.prototype.processMessage',
+		const chatLog = foundry.applications.sidebar.tabs.ChatLog;
+		if (typeof chatLog?.prototype?.processMessage === 'function') libWrapper.register(SETTINGS.MOD_NAME, 'foundry.applications.sidebar.tabs.ChatLog.prototype.processMessage',
 			/**
 			 * @this {ChatLog}
 			 * @param {Function} wrapper
@@ -109,8 +107,11 @@ export default class DFChatEdit {
 				}
 				const result = wrapper(message);
 				if (originalMessage) {
-					this._sentMessages.splice(0, 1);
-					this._sentMessages.unshift(originalMessage);
+					const queue = this.history?.queue;
+					if (queue) {
+						queue.splice(0, 1);
+						queue.unshift(originalMessage);
+					}
 				}
 				return result;
 			}, 'WRAPPER');
@@ -152,7 +153,7 @@ export default class DFChatEdit {
 			this.chatEditor = new DFChatEditor(this);
 			await this.chatEditor._render(true);
 		}
-		this.chatEditor.element.find('textarea').focus();
+		this.chatEditor.element.querySelector('textarea')?.focus();
 	}
 
 	/**

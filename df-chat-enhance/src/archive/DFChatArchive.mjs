@@ -3,61 +3,57 @@
 /// <reference path="./types.d.ts" />
 import SETTINGS from "../../common/Settings.mjs";
 
-class ArchiveFolderMenu extends FormApplication {
-	/**@type {FormApplicationOptions}*/
-	static get defaultOptions() {
-		return foundry.utils.mergeObject(FormApplication.defaultOptions, {
-			width: 400,
-			height: 125,
-			resizable: false,
-			minimizable: false,
-			title: 'DF_CHAT_ARCHIVE.Settings.ArchiveFolder_Name',
-			template: "modules/df-chat-enhance/templates/archive-folder.hbs",
-			submitOnClose: false,
-			submitOnChange: false,
-			closeOnSubmit: true
-		});
-	}
+const ApplicationV2 = foundry.applications.api.ApplicationV2;
+const HandlebarsApplication = foundry.applications.api.HandlebarsApplicationMixin(ApplicationV2);
+const FilePickerImplementation = foundry.applications.apps.FilePicker.implementation;
+const MODULE_ID = 'df-chat-enhance-lukas';
 
-	/**@type {string}*/
+class ArchiveFolderMenu extends HandlebarsApplication {
 	#folder = SETTINGS.get(DFChatArchive.PREF_FOLDER);
-	/**@type {string}*/
 	#source = SETTINGS.get(DFChatArchive.PREF_FOLDER_SOURCE);
 
-	/**
-	 * @param {*} _options 
-	 * @returns {*}
-	 */
-	getData(_options) {
+	static DEFAULT_OPTIONS = {
+		id: 'df-chat-archive-folder',
+		position: { width: 400, height: 125 },
+		window: { title: 'DF_CHAT_ARCHIVE.Settings.ArchiveFolder_Name', resizable: false, minimizable: false },
+		form: {
+			handler: async function () { await this._saveFolder(); },
+			submitOnChange: false,
+			closeOnSubmit: true
+		}
+	};
+
+	static PARTS = {
+		form: { template: `modules/${MODULE_ID}/templates/archive-folder.hbs` }
+	};
+
+	async _prepareContext() {
 		return { path: this.#folder };
 	}
 
-	/**
-	 * @param {*} data
-	 * @returns {Promise<JQuery<HTMLElement>}
-	 */
-	async _renderInner(data) {
-		const html = await super._renderInner(data);
-		/**@type {HTMLInputElement}*/
-		const input = html.find('input#dfce-ca-folder-path')[0];
-		html.find('label>button').on('click', async event => {
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		const input = this.element.querySelector('input#dfce-ca-folder-path');
+		this.element.querySelector('label>button')?.addEventListener('click', async event => {
 			event.preventDefault();
-			const fp = new FilePicker({
+			const picker = new FilePickerImplementation({
 				title: 'DF_CHAT_ARCHIVE.Settings.ArchiveFolder_Name',
 				type: 'folder',
 				field: input,
-				callback: async (path) => {
-					this.#source = fp.activeSource;
+				callback: path => {
+					this.#source = picker.activeSource;
 					this.#folder = path;
+					input.value = path;
 				},
 				button: event.currentTarget
 			});
-			await fp.browse(SETTINGS.get(DFChatArchive.PREF_FOLDER));
+			await picker.browse(this.#folder);
 		});
-		return html;
 	}
-	/** @protected */
-	async _updateObject() {
+
+	async _saveFolder() {
+		const input = this.element.querySelector('input#dfce-ca-folder-path');
+		if (input) this.#folder = input.value;
 		await SETTINGS.set(DFChatArchive.PREF_FOLDER, this.#folder);
 		await SETTINGS.set(DFChatArchive.PREF_FOLDER_SOURCE, this.#source);
 	}
@@ -132,8 +128,8 @@ export class DFChatArchive {
 	static async #createArchiveFolderIfMissing() {
 		/**@type {string}*/
 		const folder = SETTINGS.get(this.PREF_FOLDER);
-		await FilePicker.browse(this.#DATA_FOLDER, folder).catch(async _ => {
-			if (!await FilePicker.createDirectory(this.#DATA_FOLDER, folder, {}))
+		await FilePickerImplementation.browse(this.#DATA_FOLDER, folder).catch(async _ => {
+			if (!await FilePickerImplementation.createDirectory(this.#DATA_FOLDER, folder, {}))
 				throw new Error('Could not access the archive folder: ' + folder);
 		});
 	}
@@ -169,7 +165,7 @@ export class DFChatArchive {
 		// Create the File and contents
 		const file = new File([JSON.stringify(chats, null, '')], fileName, { type: 'application/json' });
 		/**@type { { path?: string; message?: string } }*/
-		const response = await FilePicker.upload(this.#DATA_FOLDER, folderPath, file);
+		const response = await FilePickerImplementation.upload(this.#DATA_FOLDER, folderPath, file);
 		if (!response.path) {
 			console.error(`Could not create archive ${fileName}\nReason: ${response}`);
 			throw new Error('Could not upload the archive to server: ' + fileName);
@@ -193,7 +189,7 @@ export class DFChatArchive {
 	 */
 	static async createChatArchive(name, chats, visible) {
 		const newId = SETTINGS.get(this.#PREF_CID) + 1;
-		SETTINGS.set(this.#PREF_CID, newId);
+		await SETTINGS.set(this.#PREF_CID, newId);
 		const entry = await this.#_generateChatArchiveFile(newId, name, chats, visible);
 		/**@type {DFChatArchiveEntry[]}*/
 		const logs = SETTINGS.get(this.#PREF_LOGS);
@@ -231,7 +227,7 @@ export class DFChatArchive {
 			const folderPath = SETTINGS.get(this.PREF_FOLDER);
 			const file = new File([JSON.stringify(newChatData)], archive.filename, { type: 'application/json' });
 			/**@type { {path?: string, message?: string} }*/
-			const response = await FilePicker.upload(this.#DATA_FOLDER, folderPath, file, {});
+			const response = await FilePickerImplementation.upload(this.#DATA_FOLDER, folderPath, file, {});
 			if (!response.path)
 				throw new Error('Could not upload the archive to server side: ' + archive.id.toString());
 		}
@@ -251,7 +247,7 @@ export class DFChatArchive {
 		// Can not delete files currently, truncate instead to make filtering easier.
 		await Promise.all(logs.map(archive => {
 			const file = new File([''], archive.filename, { type: 'application/json' });
-			return FilePicker.upload(this.#DATA_FOLDER, folderPath, file, {});
+			return FilePickerImplementation.upload(this.#DATA_FOLDER, folderPath, file, {});
 		}));
 		await SETTINGS.set(this.#PREF_LOGS, []);
 		if (this.#_updateListener != null)
@@ -275,7 +271,7 @@ export class DFChatArchive {
 		const entry = logs[entryIdx];
 		// Cannot delete file currently, instead truncate the file and move along.
 		const file = new File([''], entry.filename, { type: 'application/json' });
-		await FilePicker.upload(this.#DATA_FOLDER, folderPath, file, {});
+		await FilePickerImplementation.upload(this.#DATA_FOLDER, folderPath, file, {});
 		logs.splice(entryIdx, 1);
 		await SETTINGS.set(this.#PREF_LOGS, logs);
 		if (this.#_updateListener != null)

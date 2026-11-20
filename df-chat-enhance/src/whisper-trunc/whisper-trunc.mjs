@@ -1,9 +1,10 @@
 /// <reference path="../../../common/foundry.d.ts" />
 /// <reference path="../../../fvtt-scripts/foundry.js" />
 import SETTINGS from "../../common/Settings.mjs";
+import UTIL from "../Util.mjs";
 
-const TEMPLATE = "$0: $1 (+$2&nbsp;more)";
-const LENGTH_ADJUST = '&nbsp;'.length - 1;
+const TEMPLATE = "$0: $1 (+$2\u00a0more)";
+const LENGTH_ADJUST = 0;
 
 export default class WhisperTruncation {
 
@@ -11,10 +12,7 @@ export default class WhisperTruncation {
 	/**@readonly*/static #PREF_CHAR_LIMIT = 'whisper-trunc_char-limit';
 
 	static init() {
-		if (!game.dnd5e)
-			Hooks.on('renderChatMessage', this.#_messageRender.bind(this));
-		else
-			Hooks.on('dnd5e.renderChatMessage', this.#_messageRender.bind(this));
+		Hooks.on('renderChatMessageHTML', this.#_messageRender.bind(this));
 
 
 
@@ -25,11 +23,7 @@ export default class WhisperTruncation {
 			type: Boolean,
 			default: true,
 			scope: 'world',
-			onChange: async () => {
-				ui.chat._state = 0;
-				ui.chat._lastId = null;
-				await ui.chat.render(true);
-			}
+			onChange: UTIL.reloadChatLog
 		});
 		SETTINGS.register(this.#PREF_CHAR_LIMIT, {
 			name: 'DF_CHAT_WHISPER_TRUNC.SettingCharLimitName',
@@ -38,17 +32,13 @@ export default class WhisperTruncation {
 			type: Number,
 			default: 50,
 			scope: 'world',
-			onChange: async () => {
-				ui.chat._state = 0;
-				ui.chat._lastId = null;
-				await ui.chat.render(true);
-			}
+			onChange: UTIL.reloadChatLog
 		});
 	}
 
 	/**
 	 * @param {ChatMessage} message
-	 * @param {JQuery<HTMLElement> | HTMLElement} html
+	 * @param {HTMLElement} html
 	 */
 	static #_messageRender(message, html) {
 		// ignore regular messages, or whispers with only 1 recipient
@@ -72,15 +62,11 @@ export default class WhisperTruncation {
 		// If we never ran out of room, exit
 		if (c === users.length) return;
 		// Update the HTML
-		if (!game.dnd5e)
-			html.find('span.whisper-to')
-				.replaceWith(`<span class="whisper-to" data-tooltip="${users.slice(c).map(x => x.name).join(', ')}">${title}</span>`);
-		else {
-			/**@type {HTMLElement}*/
-			const element = html.querySelector('h4.message-sender span.subtitle');
-			element.innerHTML = title;
-			element.dataset.tooltip = users.slice(c).map(x => x.name).join(', ');
-		}
+		const names = users.slice(c).map(user => user.name).join(', ');
+		const recipientElement = html.querySelector('span.whisper-to, h4.message-sender span.subtitle');
+		if (!recipientElement) return;
+		recipientElement.textContent = title;
+		recipientElement.dataset.tooltip = names;
 	}
 
 	/**

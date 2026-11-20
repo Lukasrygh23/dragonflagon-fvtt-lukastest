@@ -1,5 +1,18 @@
 # DF Chat Enhancements
 
+## Release 5.1.23
+- **UPDATE:** Verified compatible with Foundry VTT 13.351.
+
+## Release 5.1.22
+- **FIX:** Long archive lists scroll within the archive manager.
+
+## Release 5.1.21
+- **FIX:** Long chat archives scroll within the archive viewer.
+
+## Release 5.1.20
+- **FIX:** Saving a chat archive no longer submits the browser form as a page navigation.
+- **FIX:** Application settings no longer overwrite shared Foundry application defaults.
+
 ## Release 5.1.0 (2025-04-24)
 - **UPDATE:** Korean Localization: Courtesy of [Jihoon9836](https://github.com/Jihoon9836)
 - **NEW #457:** New keyboard shortcut registered for a Roll Mode Quick Toggle which allows you to quickly switch between two configurable roll modes.

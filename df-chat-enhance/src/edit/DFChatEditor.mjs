@@ -5,31 +5,34 @@
 import SETTINGS from "../../common/Settings.mjs";
 import DFChatEdit from "./df-chat-edit.mjs";
 
-export default class DFChatEditor extends FormApplication {
+const ApplicationV2 = foundry.applications.api.ApplicationV2;
+const HandlebarsApplication = foundry.applications.api.HandlebarsApplicationMixin(ApplicationV2);
+const MODULE_ID = 'df-chat-enhance-lukas';
+
+export default class DFChatEditor extends HandlebarsApplication {
 	/**@type {ChatMessage}*/ #chatMessage = null;
 	/**@readonly*/ static PREF_MARKDOWN = 'edit-markdown';
 
-	/**
-	 * Assign the default options which are supported by the entity edit sheet.
-	 * @returns {FormApplicationOptions} The default options for this FormApplication class
-	 * @override
-	 * @see {@link Application.defaultOptions}
-	 */
-	static get defaultOptions() {
-		return foundry.utils.mergeObject(FormApplication.defaultOptions, {
-			closeOnSubmit: true,
-			editable: true,
-			resizable: true,
-			width: 400,
-			popOut: true,
-			title: 'DF_CHAT_EDIT.Editor_Title',
-			template: 'modules/df-chat-enhance/templates/chat-edit.hbs'
-		});
-	}
+	static DEFAULT_OPTIONS = {
+		id: 'df-chat-message-editor',
+		position: { width: 400 },
+		window: { title: 'DF_CHAT_EDIT.Editor_Title', resizable: true },
+		form: {
+			handler: async function (event, _form, formData) {
+				await this._updateObject(event, formData.object);
+			},
+			submitOnChange: false,
+			closeOnSubmit: true
+		}
+	};
+
+	static PARTS = {
+		form: { template: `modules/${MODULE_ID}/templates/chat-edit.hbs` }
+	};
 
 	/**@param {ChatMessage} chatMessage*/
 	constructor(chatMessage) {
-		super({});
+		super();
 		this.#chatMessage = chatMessage;
 	}
 
@@ -38,7 +41,7 @@ export default class DFChatEditor extends FormApplication {
 	 * @param {any} [options]
 	 * @returns {any}
 	 */
-	getData(options) {
+	_prepareContext() {
 		// Collect the different Actor types and the labels for those types
 		const types = Object.keys(CONFIG.Actor.typeLabels).map(type => {
 			return { type, label: (foundry.utils.hasProperty(game.i18n.translations, CONFIG.Actor.typeLabels[type]) ? CONFIG.Actor.typeLabels[type] : "Tokens"), actors: [] };
@@ -52,29 +55,28 @@ export default class DFChatEditor extends FormApplication {
 		}
 
 		let selected = '';
-		if (this.#chatMessage.author)
-			selected = 'user-' + this.#chatMessage.author;
+		const authorId = typeof this.#chatMessage.author === 'string' ? this.#chatMessage.author : this.#chatMessage.author?.id;
+		if (authorId)
+			selected = 'user-' + authorId;
 		if (this.#chatMessage.speaker.token)
 			selected = 'token-' + this.#chatMessage.speaker.token;
 
-		return foundry.utils.mergeObject(options, {
+		return {
 			selected,
 			players: game.user.isGM ? game.users.map(x => ({ id: 'user-' + x.id, name: x.name })) : [{ id: 'user-' + game.userId, name: game.user.name }],
 			actorGroups: types.filter(x => x.actors.length > 0),
 			messageText: this.#chatMessage.content
 				.replace(/< *br *\/?>/gm, '\n')
 				.replace(/<p +class="df-edited">.+/, '')
-		});
+		};
 	}
 
-	/**
-	 * @override
-	 * @param {JQuery} html
-	 * @returns {void}
-	 */
-	activateListeners(html) {
-		super.activateListeners(html);
-		html.find('#cancel').on('click', async () => await this.close());
+	async _onRender(context, options) {
+		await super._onRender(context, options);
+		this.element.querySelector('#cancel')?.addEventListener('click', async event => {
+			event.preventDefault();
+			await this.close();
+		});
 	}
 
 	/**
@@ -93,25 +95,25 @@ export default class DFChatEditor extends FormApplication {
 			data += `<p class="df-edited">${'DF_CHAT_EDIT.EditedFlag'.localize()}</p>`;
 		}
 
-		let speaker = undefined;
-		let user = undefined;
+		let speaker;
+		let author;
 		if (formData.speaker.startsWith('user-')) {
-			user = game.users.get(formData.speaker.substring('user-'.length)).id;
-			speaker = ChatMessage._getSpeakerFromUser({ user });
+			author = game.users.get(formData.speaker.substring('user-'.length))?.id;
+			speaker = ChatMessage.getSpeaker({ user: author });
 		} else
 			speaker = ChatMessage.getSpeaker({ token: game.scenes.viewed.tokens.get(formData.speaker.substring('token-'.length)) });
 		if (speaker.alias === undefined)
 			speaker.alias = null;
-		this.#chatMessage.update({ content: data, speaker, user });
+		await this.#chatMessage.update({ content: data, speaker, author });
 	}
 	/**
 	 * @override
 	 * @param {FormApplication.CloseOptions} [options]
 	 * @returns {Promise<void>}
 	 */
-	close(options) {
+	_onClose(options) {
 		delete this.#chatMessage.chatEditor;
-		return super.close(options);
+		super._onClose(options);
 	}
 
 	/**

@@ -140,25 +140,28 @@ export default class ChatRollPrivacy {
 	 * @param {ChatLogData} data
 	 * @returns {Promise<void>}
 	 */
-	static async #_handleChatLogRendering(chat, html, data) {
+	static async #_handleChatLogRendering(chat, html, data = {}) {
+		html = $(html);
 		const buttons = [];
 		const iconKeys = Object.keys(ICONS_FOR_KNOWN_ROLL_TYPES);
-		for (let c = 0; c < data.rollModes.length; c++) {
-			const rt = data.rollModes[c].value;
+		const rollModes = data.rollModes ?? Object.entries(CONFIG.Dice.rollModes).map(([value, mode]) => ({ value, label: mode.label }));
+		for (let c = 0; c < rollModes.length; c++) {
+			const mode = rollModes[c];
+			const rt = typeof mode === 'string' ? mode : mode.value;
 			if (!(rt in ICONS_FOR_KNOWN_ROLL_TYPES)) {
 				console.warn(Error(`Unknown roll type '${rt}'`));
 				continue;
 			}
 			buttons.push({
 				rt: rt,
-				name: data.rollModes[rt],
+				name: game.i18n.localize(typeof mode === 'string' ? CONFIG.Dice.rollModes[rt].label : mode.label),
 				isGM: game.user.isGM,
-				active: data.rollMode === rt,
+				active: (data.rollMode ?? game.settings.get('core', 'rollMode')) === rt,
 				icon: ICONS_FOR_KNOWN_ROLL_TYPES[rt],
 				colour: ChatRollPrivacy.#calcColour(iconKeys.findIndex(x => x == rt), iconKeys.length)
 			});
 		}
-		const buttonHtml = $(await renderTemplate('modules/df-chat-enhance/templates/privacy-button.hbs', { buttons }));
+		const buttonHtml = $(await foundry.applications.handlebars.renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/privacy-button.hbs`, { buttons }));
 		buttonHtml.find('button').on('click', function () {
 			const rollType = $(this).attr('data-id');
 			game.settings.set("core", "rollMode", rollType);
@@ -174,16 +177,18 @@ export default class ChatRollPrivacy {
 		// Adjust the button container to remove the extra margin since those buttons are now moving in.
 		buttonHtml.attr('style', 'margin:0 0 0 0.5em');
 	
-		// Convert the old <a> tag elements to <button> tags
 		let first = true;
 		html.find('#chat-controls div.control-buttons a').each(function () {
 			const html = $(this).html();
 			const classes = $(this).attr('class');
 			const title = $(this).attr('title');
 			const style = $(this).attr('style');
-			const click = $._data(this, 'events')['click'][0].handler;
+			const original = $(this).clone(true, true);
 			const button = $(`<button class="${classes}" title="${title}" style="${style}">${html}</button>`);
-			button.on('click', click);
+			button.on('click', event => {
+				event.preventDefault();
+				original.trigger('click');
+			});
 			// Add a small margin between the first button and the RollTypes
 			if (first) {
 				button.attr('style', 'margin-left:0.5em');
