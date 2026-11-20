@@ -2,41 +2,96 @@ import { ChatMessageData } from '@league-of-foundry-developers/foundry-vtt-types
 import SETTINGS from '../../../common/Settings';
 import { DFChatArchive, DFChatArchiveEntry } from './DFChatArchive';
 
-const ApplicationV2Base = (globalThis as any).foundry?.applications?.api?.ApplicationV2;
-const HandlebarsApplicationBase = (globalThis as any).foundry?.applications?.api?.HandlebarsApplicationMixin;
-const ApplicationBase = HandlebarsApplicationBase && ApplicationV2Base
-	? HandlebarsApplicationBase(ApplicationV2Base)
+const ApplicationV2 = (globalThis as any).foundry?.applications?.api?.ApplicationV2;
+const HandlebarsApplicationMixin = (globalThis as any).foundry?.applications?.api?.HandlebarsApplicationMixin;
+const ApplicationBase = ApplicationV2 && HandlebarsApplicationMixin
+	? HandlebarsApplicationMixin(ApplicationV2)
 	: Application;
 
 export default class DFChatArchiveViewer extends ApplicationBase {
 	archive: DFChatArchiveEntry;
 	messages: ChatMessageData[];
 	onCloseCallBack: (view: DFChatArchiveViewer) => void;
+
+	static DEFAULT_OPTIONS = ApplicationV2 ? foundry.utils.mergeObject(ApplicationV2.DEFAULT_OPTIONS, {
+		id: 'df-chat-archive-viewer',
+		classes: ['df-chat-log-window'],
+		position: { width: 300, height: 500 },
+		window: {
+			title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Title',
+			resizable: true
+		}
+	}) : undefined;
+
+	static PARTS = ApplicationV2 ? {
+		body: {
+			template: 'modules/df-chat-enhance-lukas/templates/archive-viewer.hbs',
+			scrollable: ['']
+		}
+	} : undefined;
+
 	constructor(archive: DFChatArchiveEntry, onCloseCallBack: (view: DFChatArchiveViewer) => void) {
 		super();
 		this.archive = archive;
 		this.onCloseCallBack = onCloseCallBack;
 	}
 
-	static get defaultOptions() {
-		return foundry.utils.mergeObject((ApplicationBase as any).defaultOptions ?? Application.defaultOptions as Partial<ApplicationOptions>, {
-			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-viewer.hbs`,
-			width: 300,
-			height: 500,
-			resizable: true,
-			title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Title',
-			classes: ['df-chat-log-window']
-		}) as ApplicationOptions;
-	}
-
-	getData(options = {}) {
-		super.getData(options);
+	async _prepareContext(_options: any = {}) {
 		return {
 			name: this.archive.name,
 			isGM: game.user.isGM,
 			visible: this.archive.visible ?? false,
 			logId: 'df-chat-log-' + this.archive.id
 		};
+	}
+
+	async _onRender(_context: any, _options: any) {
+		if (!ApplicationV2) return;
+		const element = (this as any).element;
+		const root = element instanceof HTMLElement ? element : element?.[0];
+		if (!root) return;
+		const html = $(root);
+
+		html.find('#visible-df-chat-log-' + this.archive.id).on('change', async (event: JQuery.ChangeEvent) => {
+			this.archive.visible = (event.target as HTMLInputElement).checked;
+			await DFChatArchive.updateChatArchive(this.archive);
+		});
+
+		const log = html.find('#df-chat-log');
+		const archivedMessages = await DFChatArchive.getArchiveContents(this.archive) as (ChatMessage | ChatMessageData)[];
+		this.messages = archivedMessages
+			.map((message: any) => {
+				const data = message?.toJSON ? message.toJSON() : { ...message };
+				const author = data.author ?? data.user;
+				if (author) data.author = author;
+				delete data.user;
+				return data as ChatMessageData;
+			})
+			.filter((message: any) => game.user.isGM
+				|| message.author === game.userId
+				|| message.type !== CONST.CHAT_MESSAGE_TYPES.WHISPER
+				|| (message.whisper ?? []).some((recipient: string) => recipient === game.userId));
+
+		const messageHtml: HTMLElement[] = [];
+		for (const value of this.messages as ChatMessageData[]) {
+			const chatMessage = value instanceof ChatMessage ? value : new ChatMessage(value);
+			try {
+				const rendered = await chatMessage.getHTML();
+				if (this.messages.length === 1) rendered.find('a.message-delete').hide();
+				messageHtml.push(rendered[0] ?? rendered);
+			} catch (error) {
+				console.error(`Chat message ${chatMessage.id} failed to render.\n${error}`);
+			}
+		}
+		log.prepend(messageHtml);
+
+		html.find('#html').on('click', () => {
+			const data = $('<div></div>').append(log.clone()).html();
+			const anchor = document.createElement('a');
+			anchor.download = encodeURI(this.archive.name) + '.html';
+			anchor.href = 'data:text/html,' + encodeURIComponent(data);
+			anchor.click();
+		});
 	}
 
 	// convert a Unicode string to a string in which
@@ -69,12 +124,12 @@ export default class DFChatArchiveViewer extends ApplicationBase {
 				html.find("#edit").on('click', async () => {
 					setTimeout(async () => {
 						const dialog = new Dialog({
-							title: "DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Title".localize(),
+							title: game.i18n.localize("DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Title"),
 							content: `<input id="name" type="text" value="${this.archive.name}"/>`,
 							buttons: {
 								save: {
 									icon: '<i class="fas fa-save"></i>',
-									label: 'DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Save'.localize(),
+									label: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_NameEdit_Save'),
 									callback: async (html) => {
 										this.archive.name = $(html).find('#name').val() as string;
 										await dialog.close();
@@ -95,26 +150,16 @@ export default class DFChatArchiveViewer extends ApplicationBase {
 						dialog.render(true);
 					}, 1);
 				});
-				html.find('#print').on('click', async () => {
-					const clone = html.find('#df-chat-log').clone();
-					clone.addClass('df-chat-print');
-					$('body').hide();
-					$('html').addClass('df-chat-print');
-					$('html').append(clone);
-					window.print();
-					clone.remove();
-					$('html').removeClass('df-chat-print');
-					$('body').show();
-				});
+				html.find('#print').on('click', () => this.printArchive(html));
 				html.find('#merge').on('click', async () => {
 					if (DFChatArchive.getLogs().length == 1) {
-						ui.notifications.info('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_OnlyOneArchive'.localize());
+						ui.notifications.info(game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_OnlyOneArchive'));
 						return;
 					}
 					const dialog: Dialog = new Dialog({
-						title: 'DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Title'.localize(),
+						title: game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveViewer_Merge_Title'),
 						default: 'merge',
-						content: await renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/archive-merge.hbs`, {
+						content: await foundry.applications.handlebars.renderTemplate('modules/df-chat-enhance-lukas/templates/archive-merge.hbs', {
 							id: this.archive.id,
 							name: this.archive.name,
 							archives: DFChatArchive.getLogs().filter(x => x.id != this.archive.id)
@@ -161,8 +206,19 @@ export default class DFChatArchiveViewer extends ApplicationBase {
 
 				const log = html.find('#df-chat-log');
 				const messageHtml = [];
-				this.messages = (await DFChatArchive.getArchiveContents(this.archive) as ChatMessageData[])
-					.filter(x => game.user.isGM || x.user === game.userId || x.type !== CONST.CHAT_MESSAGE_TYPES.WHISPER || x.whisper.some(x => x === game.userId));
+				const archivedMessages = await DFChatArchive.getArchiveContents(this.archive) as (ChatMessage | ChatMessageData)[];
+				this.messages = archivedMessages
+					.map((message: any) => {
+						const data = message?.toJSON ? message.toJSON() : { ...message };
+						const author = data.author ?? data.user;
+						if (author) data.author = author;
+						delete data.user;
+						return data as ChatMessageData;
+					})
+					.filter((x: any) => game.user.isGM
+						|| x.author === game.userId
+						|| x.type !== CONST.CHAT_MESSAGE_TYPES.WHISPER
+						|| (x.whisper ?? []).some((recipient: string) => recipient === game.userId));
 
 				const deletionList: string[] = [];
 				const deleteButton = html.find('#dfal-save-changes');
@@ -227,5 +283,41 @@ export default class DFChatArchiveViewer extends ApplicationBase {
 	close(options?: Application.CloseOptions): Promise<void> {
 		this.onCloseCallBack(this);
 		return super.close(options);
+	}
+
+	private printArchive(html: JQuery<HTMLElement>): void {
+		const log = html.find('#df-chat-log').clone();
+		log.removeAttr('id').addClass('df-chat-print');
+
+		const frame = document.createElement('iframe');
+		frame.setAttribute('aria-hidden', 'true');
+		Object.assign(frame.style, {
+			position: 'fixed',
+			width: '794px',
+			height: '1123px',
+			left: '-10000px',
+			top: '0',
+			visibility: 'hidden'
+		});
+		document.body.appendChild(frame);
+
+		const printDocument = frame.contentDocument;
+		if (!printDocument) {
+			frame.remove();
+			ui.notifications.warn('Unable to create a print document for this archive.');
+			return;
+		}
+
+		printDocument.open();
+		printDocument.write('<!doctype html><html><head><meta charset="utf-8"><title></title><style>@media print { body { margin: 0; background: #fff; color: #111; } .df-chat-print { width: 100%; margin: 0; padding: 12px; box-sizing: border-box; } }</style></head><body></body></html>');
+		printDocument.close();
+		printDocument.title = this.archive.name;
+
+		printDocument.body.appendChild(log[0]);
+
+		const cleanup = () => frame.remove();
+		frame.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
+		frame.contentWindow?.requestAnimationFrame(() => frame.contentWindow?.print());
+		window.setTimeout(cleanup, 30000);
 	}
 }

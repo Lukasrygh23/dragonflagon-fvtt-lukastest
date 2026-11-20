@@ -45,11 +45,12 @@ export default class ChatTime {
 				return wrapped(chatData, createOptions);
 			}, 'WRAPPER');
 
-		Hooks.on('renderChatMessage', (message: ChatMessage, html: JQuery<HTMLElement>, _data: any) => {
+		Hooks.on('renderChatMessageHTML', (message: ChatMessage, html: HTMLElement, _data: any) => {
 			if (!this.simpleCalendarActive || !this.enabled) return;
 			const simpleTimestamp = <number>message.getFlag(SETTINGS.MOD_NAME, this.FLAG_CHAT_TIME);
 			if (simpleTimestamp === undefined) return;
-			const timeElement = html.find('.message-timestamp');
+			const $html = $(html);
+			const timeElement = $html.find('.message-timestamp');
 			const simpleTimeElement = $(`<time class="dfce-simple-timestamp">${SimpleCalendar.api.formatDateTime(
 				SimpleCalendar.api.timestampToDate(simpleTimestamp), SETTINGS.get<string>(this.PREF_FORMAT)
 			)}</time>`);

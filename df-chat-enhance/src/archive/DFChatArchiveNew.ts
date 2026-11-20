@@ -1,19 +1,24 @@
 import { DFChatArchive } from "./DFChatArchive";
 import SETTINGS from "../../../common/Settings";
 
-const FormApplicationBase = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ?? FormApplication;
+const FormApplicationV2 = (globalThis as any).foundry?.applications?.api?.FormApplicationV2;
+const FormApplicationBase = FormApplicationV2 ?? FormApplication;
 
-export default class DFChatArchiveNew extends FormApplicationBase<FormApplicationOptions, { shouldDelete: boolean }> {
+export default class DFChatArchiveNew extends FormApplicationBase {
 	static readonly PREF_DELETE = 'new-should-delete';
 	static readonly PREF_HIDE_EXPORT = 'hide-export';
-	static get defaultOptions() {
-		return foundry.utils.mergeObject(FormApplication.defaultOptions, {
-			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-new.hbs`,
-			resizable: false,
-			minimizable: false,
-			title: "DF_CHAT_ARCHIVE.ArchiveNew_Title".localize()
-		});
-	}
+
+	static DEFAULT_OPTIONS = FormApplicationV2 ? foundry.utils.mergeObject(FormApplicationV2.DEFAULT_OPTIONS, {
+		id: 'df-chat-archive-new',
+		position: { width: 400 },
+		window: { title: 'DF_CHAT_ARCHIVE.ArchiveNew_Title' }
+	}) : undefined;
+
+	static PARTS = FormApplicationV2 ? {
+		form: {
+			template: 'modules/df-chat-enhance-lukas/templates/archive-new.hbs'
+		}
+	} : undefined;
 
 	static registerSettings() {
 		SETTINGS.register(DFChatArchiveNew.PREF_DELETE, {
@@ -24,9 +29,25 @@ export default class DFChatArchiveNew extends FormApplicationBase<FormApplicatio
 		});
 	}
 
-	getData(options?: any) {
-		return foundry.utils.mergeObject(super.getData(options), {
-			shouldDelete: SETTINGS.get(DFChatArchiveNew.PREF_DELETE) as boolean
+	async _prepareContext(_options: any = {}) {
+		return { shouldDelete: SETTINGS.get(DFChatArchiveNew.PREF_DELETE) as boolean };
+	}
+
+	async _onRender(_context: any, _options: any) {
+		if (!FormApplicationV2) return;
+		const element = (this as any).element;
+		const root = element instanceof HTMLElement ? element : element?.[0];
+		if (!root) return;
+		const html = $(root);
+		const from = html.find('#dfca-from');
+		const to = html.find('#dfca-to');
+		html.find('#dfca-all').on('change', () => { from.prop('disabled', true); to.prop('disabled', true); });
+		html.find('#dfca-date').on('change', () => { from.prop('disabled', false); to.prop('disabled', false); });
+		html.find('form').on('submit', async (event) => {
+			event.preventDefault();
+			const formData = new foundry.applications.ux.FormDataExtended(event.currentTarget).object;
+			await this._updateObject(event, formData);
+			await this.close();
 		});
 	}
 
@@ -64,24 +85,5 @@ export default class DFChatArchiveNew extends FormApplicationBase<FormApplicatio
 		if (!formData.delete) return;
 
 		game.messages.flush();
-	}
-
-	_renderInner(data: { shouldDelete: boolean }): Promise<JQuery<HTMLElement>> {
-		return super._renderInner(data)
-			.then((html) => {
-				const from = html.find('#dfca-from');
-				const to = html.find('#dfca-to');
-				html.find('#dfca-all').on('change', () => {
-					from.prop('disabled', true);
-					to.prop('disabled', true);
-					this._recalculateDimensions();
-				});
-				html.find('#dfca-date').on('change', () => {
-					from.prop('disabled', false);
-					to.prop('disabled', false);
-					this._recalculateDimensions();
-				});
-				return html;
-			});
 	}
 }

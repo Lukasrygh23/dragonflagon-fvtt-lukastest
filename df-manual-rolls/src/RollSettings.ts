@@ -34,10 +34,10 @@ export default class RollSettings {
 	</div>
 </div>`);
 			html.find('#characters').parent().before(rollConfig);
-			// Resize the window
-			app.element[0].style.height = '';
-			app.element[0].style.width = '';
-			app.setPosition({});
+			// Resize the window without clearing width, which can trigger invalid CSS in modern Foundry.
+			const appElement = (app as any).element?.[0] ?? (app as any).element;
+			if (appElement?.style) appElement.style.height = '';
+			if (typeof (app as any).setPosition === 'function') (app as any).setPosition({});
 			if (!(app as any)._updateObject_ORIG) {
 				(app as any)._updateObject_ORIG = (app as any)._updateObject;
 				(app as any)._updateObject = async function (...args: any) {

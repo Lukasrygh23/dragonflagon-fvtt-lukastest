@@ -51,8 +51,10 @@ export default class DFChatEditor extends FormApplicationBase {
 		}
 
 		let selected = '';
-		if (this.chatMessage.user)
-			selected = 'user-' + this.chatMessage.user;
+		const chatData: any = (this.chatMessage as any)?.toJSON ? (this.chatMessage as any).toJSON() : this.chatMessage;
+		const authorId = chatData.author ?? chatData._source?.author;
+		if (authorId)
+			selected = 'user-' + authorId;
 		if (this.chatMessage.speaker.token)
 			selected = 'token-' + this.chatMessage.speaker.token;
 

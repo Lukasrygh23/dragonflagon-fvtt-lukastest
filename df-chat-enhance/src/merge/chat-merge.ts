@@ -110,9 +110,19 @@ export default class ChatMerge {
 		});
 
 		libWrapperShared.register('ChatLog.prototype.deleteMessage', this._deleteMessage.bind(this));
-		Hooks.on("renderChatMessage", this._renderChatMessage);
+		Hooks.on("renderChatMessageHTML", this._renderChatMessageHTML);
 	}
 	static ready() {
+		if (!SETTINGS.isRegistered(this.PREF_SEPARATE)) {
+			SETTINGS.register(this.PREF_SEPARATE, {
+				name: 'DF_CHAT_MERGE.SeparateName',
+				hint: 'DF_CHAT_MERGE.SeparateHint',
+				config: true,
+				scope: 'client',
+				default: false,
+				type: Boolean
+			});
+		}
 		const style = (<HTMLElement>document.querySelector(':root')).style;
 		style.setProperty('--dfce-cm-separation', this._separateWithBorder ? '' : '0');
 		this._showHover ? style.removeProperty('--dfce-cm-hover-shadow') : style.setProperty('--dfce-cm-hover-shadow', '0px');
@@ -186,7 +196,7 @@ export default class ChatMerge {
 		}
 	}
 
-	private static _renderChatMessage(message: ChatMessageData, html: JQuery<HTMLElement>, _cmd: ChatMessageData) {
+	private static _renderChatMessageHTML(message: ChatMessageData, html: HTMLElement, _cmd: ChatMessageData) {
 		if (!ChatMerge._enabled) return;
 		// Find the most recent message in the chat log
 		const partnerElem = $(`li.chat-message`).last()[0];
@@ -196,7 +206,7 @@ export default class ChatMerge {
 		const partner = game.messages.get(partnerElem.getAttribute('data-message-id'));
 		if (!message || !partner) return;
 		// Update styling of the chat messages
-		ChatMerge._styleChatMessages(message, html[0], partner, partnerElem);
+		ChatMerge._styleChatMessages(message, html, partner, partnerElem);
 	}
 
 	private static _inTimeFrame(current: number, previous: number): boolean {
@@ -208,8 +218,10 @@ export default class ChatMerge {
 		const splitSpeaker = SETTINGS.get<boolean>(this.PREF_SPLIT_SPEAKER);
 		let userCompare = false;
 
-		const currData = current ?? <ChatMessageData><any>current;
-		const prevData = previous ?? <ChatMessageData><any>previous;
+		const currData: any = (current as any)?.toJSON ? (current as any).toJSON() : { ...(current as any) };
+		const prevData: any = (previous as any)?.toJSON ? (previous as any).toJSON() : { ...(previous as any) };
+		const currAuthor = currData.author ?? currData._source?.author;
+		const prevAuthor = prevData.author ?? prevData._source?.author;
 
 		// If either message is a Midi-QoL message, ignore it
 		if ((currData?.flags && (currData.flags as Record<string, any>)['midi-qol']) || (prevData?.flags && (prevData.flags as Record<string, any>)['midi-qol']))
@@ -224,11 +236,10 @@ export default class ChatMerge {
 				( // If BOTH actors are null and users are equal
 					!currData.speaker.actor
 					&& !prevData.speaker.actor
-					&& currData.user === prevData.user
 				);
 		} else {
-			// If we are not splitting by speaker, just do the simple option of comparing the users
-			userCompare = currData.user === prevData.user;
+			// If we are not splitting by speaker, compare the authors
+			userCompare = currAuthor === prevAuthor;
 		}
 		return userCompare
 			&& this._inTimeFrame(currData.timestamp, prevData.timestamp)

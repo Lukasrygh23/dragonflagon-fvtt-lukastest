@@ -24,9 +24,11 @@ interface ChatLogData {
 
 export default class ChatRollPrivacy {
 	static setup() {
+		const KeyboardManagerAPI = (globalThis as any).foundry?.helpers?.interaction?.KeyboardManager ?? (globalThis as any).KeyboardManager;
+
 		game.keybindings.register(SETTINGS.MOD_NAME, "roll-mode.publicroll", {
 			name: 'Public Roll',
-			editable: [{ key: 'KeyQ', modifiers: [KeyboardManager.MODIFIER_KEYS.ALT] }],
+			editable: [{ key: 'KeyQ', modifiers: [KeyboardManagerAPI.MODIFIER_KEYS.ALT] }],
 			namespace: 'Roll Type Shortcuts',
 			onDown: () => {
 				$('#dfcp-rt-buttons > button[data-id="publicroll"]').trigger('click');
@@ -34,7 +36,7 @@ export default class ChatRollPrivacy {
 		});
 		game.keybindings.register(SETTINGS.MOD_NAME, "roll-mode.gmroll", {
 			name: 'Private GM Roll',
-			editable: [{ key: 'KeyW', modifiers: [KeyboardManager.MODIFIER_KEYS.ALT] }],
+			editable: [{ key: 'KeyW', modifiers: [KeyboardManagerAPI.MODIFIER_KEYS.ALT] }],
 			namespace: 'Roll Type Shortcuts',
 			onDown: () => {
 				$('#dfcp-rt-buttons > button[data-id="gmroll"]').trigger('click');
@@ -42,7 +44,7 @@ export default class ChatRollPrivacy {
 		});
 		game.keybindings.register(SETTINGS.MOD_NAME, "roll-mode.blindroll", {
 			name: 'Blind GM Roll',
-			editable: [{ key: 'KeyE', modifiers: [KeyboardManager.MODIFIER_KEYS.ALT] }],
+			editable: [{ key: 'KeyE', modifiers: [KeyboardManagerAPI.MODIFIER_KEYS.ALT] }],
 			namespace: 'Roll Type Shortcuts',
 			onDown: () => {
 				$('#dfcp-rt-buttons > button[data-id="blindroll"]').trigger('click');
@@ -50,7 +52,7 @@ export default class ChatRollPrivacy {
 		});
 		game.keybindings.register(SETTINGS.MOD_NAME, "roll-mode.selfroll", {
 			name: 'Self Roll',
-			editable: [{ key: 'KeyR', modifiers: [KeyboardManager.MODIFIER_KEYS.ALT] }],
+			editable: [{ key: 'KeyR', modifiers: [KeyboardManagerAPI.MODIFIER_KEYS.ALT] }],
 			namespace: 'Roll Type Shortcuts',
 			onDown: () => {
 				$('#dfcp-rt-buttons > button[data-id="selfroll"]').trigger('click');
@@ -102,15 +104,16 @@ export default class ChatRollPrivacy {
 				console.warn(Error(`Unknown roll type '${rt}'`));
 				continue;
 			}
+			const rollMode = rollModes[rt];
 			buttons.push({
 				rt: rt,
-				name: rollModes[rt],
+				name: typeof rollMode === 'object' ? rollMode.label : rollMode,
 				active: activeRollMode === rt,
 				icon: ICONS_FOR_KNOWN_ROLL_TYPES[rt],
 				colour: ChatRollPrivacy.calcColour(iconKeys.findIndex(x => x == rt), iconKeys.length)
 			});
 		}
-		const buttonHtml = $(await renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/privacy-button.hbs`, { buttons }));
+		const buttonHtml = $(await foundry.applications.handlebars.renderTemplate(`modules/${SETTINGS.MOD_NAME}/templates/privacy-button.hbs`, { buttons }));
 		buttonHtml.find('button').on('click', function () {
 			const rollType = $(this).attr('data-id');
 			game.settings.set("core", "rollMode", <any>rollType);

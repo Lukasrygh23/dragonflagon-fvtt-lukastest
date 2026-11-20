@@ -1,7 +1,9 @@
 import DFSceneRatio from "./df-scene-ratio";
 import SETTINGS from "../../common/Settings";
 
-const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? (() => {
+	throw new Error('FilePicker is unavailable in the current Foundry version.');
+})();
 
 interface Thumb {
 	src: string;

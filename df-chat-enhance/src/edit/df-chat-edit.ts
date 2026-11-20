@@ -60,7 +60,10 @@ export default class DFChatEdit {
 					let messages = <(ChatMessageData & ChatMessage)[]><any[]>[...(ui.chat.collection.values())];
 					// Perform an inverted sort ( n<0 before, n=0 same, n>0 after )
 					messages = messages.sort((a, b) => b.timestamp - a.timestamp);
-					const message = messages.find(x => x.user === game.user.id);
+					const message = messages.find((x: any) => {
+						const data = x?.toJSON ? x.toJSON() : x;
+						return (data.author ?? data._source?.author) === game.user.id;
+					});
 					if (!message) return;
 					DFChatEdit.editChatMessage.bind(message)();
 				}
@@ -155,8 +158,10 @@ export default class DFChatEdit {
 		if (!ui.chat.collection.has(chatMessage.id))
 			return false;
 		// Ignore rolls and other people's messages, unless we are the GM and PREF_GM_ALL is true
+		const chatData: any = (chatMessage as any)?.toJSON ? (chatMessage as any).toJSON() : chatMessage;
+		const authorId = chatData.author ?? chatData._source?.author;
 		if (!SETTINGS.get(PREF_EDIT_ALLOWED) || chatMessage.isRoll
-			|| (chatMessage.user.id !== game.userId && !(game.user.isGM && SETTINGS.get(PREF_GM_ALL))))
+			|| (authorId !== game.userId && !(game.user.isGM && SETTINGS.get(PREF_GM_ALL))))
 			return false;
 		// If we ignore html and message contains html, return
 		if (SETTINGS.get(PREF_IGNORE_HTML) && DFChatEdit.isHTML(chatMessage.content)) return false;

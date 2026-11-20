@@ -19,11 +19,17 @@ declare global {
 	}
 }
 
-(<any>Application.prototype)._recalculateDimensions = function () {
-	this.element[0].style.height = '';
-	this.element[0].style.width = '';
-	this.setPosition({});
-};
+if (!(Application.prototype as any)._recalculateDimensions) {
+	(<any>Application.prototype)._recalculateDimensions = function () {
+		const element = (this as any).element?.[0] ?? (this as any).element;
+		if (element?.style) {
+			element.style.height = '';
+		}
+		if (typeof (this as any).setPosition === 'function') {
+			(this as any).setPosition({});
+		}
+	};
+}
 
 Hooks.once('setup', function () {
 	ChatRollPrivacy.setup();

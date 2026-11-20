@@ -60,7 +60,9 @@ export function init() {
 				archiveNew = new DFChatArchiveNew({});
 				archiveNew.render(true);
 			} else {
-				archiveNew.bringToTop();
+				const app = archiveNew as any;
+				if (typeof app.bringToFront === 'function') app.bringToFront();
+				else app.bringToTop?.();
 			}
 		});
 		$html.find('.control-buttons')
@@ -78,11 +80,18 @@ export function init() {
 	<button data-action="archive"><i class="fas fa-archive"></i>${'DF_CHAT_ARCHIVE.OpenChatArchive'.localize()}</button>
 </div>`);
 		archiveManagerHtml.on('click', () => {
-			if (archiveManager == null || ![Application.RENDER_STATES.RENDERED, Application.RENDER_STATES.RENDERING].includes((<any>archiveManager)._state)) {
+			const renderStates = (Application as any)?.RENDER_STATES;
+			const state = (<any>archiveManager)?._state ?? (<any>archiveManager)?.state ?? 0;
+			const isRendered = !renderStates
+				? ['rendered', 'rendering', 1, 2].includes(state)
+				: [renderStates.RENDERED, renderStates.RENDERING].includes(state);
+			if (archiveManager == null || !isRendered) {
 				archiveManager = new DFChatArchiveManager();
 				archiveManager.render(true);
 			} else {
-				archiveManager.bringToTop();
+				const app = archiveManager as any;
+				if (typeof app.bringToFront === 'function') app.bringToFront();
+				else app.bringToTop?.();
 			}
 		});
 		const target = getSettingsTarget($html);

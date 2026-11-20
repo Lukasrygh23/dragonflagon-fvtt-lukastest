@@ -2,24 +2,65 @@ import SETTINGS from "../../../common/Settings";
 import { DFChatArchive } from "./DFChatArchive";
 import DFChatArchiveViewer from "./DFChatArchiveViewer";
 
-const ApplicationV2Base = (globalThis as any).foundry?.applications?.api?.ApplicationV2;
-const HandlebarsApplicationBase = (globalThis as any).foundry?.applications?.api?.HandlebarsApplicationMixin;
-const ApplicationBase = HandlebarsApplicationBase && ApplicationV2Base
-	? HandlebarsApplicationBase(ApplicationV2Base)
+const ApplicationV2 = (globalThis as any).foundry?.applications?.api?.ApplicationV2;
+const HandlebarsApplicationMixin = (globalThis as any).foundry?.applications?.api?.HandlebarsApplicationMixin;
+const ApplicationBase = ApplicationV2 && HandlebarsApplicationMixin
+	? HandlebarsApplicationMixin(ApplicationV2)
 	: Application;
 
+// Keeps legacy fallback for Foundry v12 while using ApplicationV2 in v13+.
 export default class DFChatArchiveManager extends ApplicationBase {
 	static readonly PREF_REVERSE_SORT = 'dfca-manager-reverseSort';
 	static chatViewers: Map<number, DFChatArchiveViewer> = new Map();
 
+	static DEFAULT_OPTIONS = ApplicationV2 ? foundry.utils.mergeObject(ApplicationV2.DEFAULT_OPTIONS, {
+		id: 'df-chat-archive-manager',
+		classes: ['df-chat-archive-manager'],
+		position: { width: 300, height: 500 },
+		window: {
+			title: 'DF_CHAT_ARCHIVE.ArchiveManager_Title',
+			resizable: true,
+			minimizable: true
+		}
+	}) : undefined;
+
+	static PARTS = ApplicationV2 ? {
+		body: {
+			template: 'modules/df-chat-enhance-lukas/templates/archive-manager.hbs',
+			scrollable: ['']
+		}
+	} : undefined;
+
+	private _getManagerData() {
+		let messages = DFChatArchive.getLogs();
+		if (!game.user.isGM) messages = messages.filter(x => x.visible);
+		messages = messages.sort((a, b) => a.name.localeCompare(b.name));
+		const reverseSort = SETTINGS.get<boolean>(DFChatArchiveManager.PREF_REVERSE_SORT);
+		return {
+			messages: reverseSort ? messages.reverse() : messages,
+			isGM: game.user.isGM,
+			reverseSort
+		};
+	}
+
+	async _prepareContext(_options: any = {}) {
+		return this._getManagerData();
+	}
+
+	_onRender(_context: any, _options: any) {
+		if (!ApplicationV2) return;
+		const element = (this as any).element;
+		this.activateListeners($(element instanceof HTMLElement ? element : element?.[0]));
+	}
+
 	static get defaultOptions() {
-		return foundry.utils.mergeObject((ApplicationBase as any).defaultOptions ?? Application.defaultOptions as Partial<ApplicationOptions>, {
+		return foundry.utils.mergeObject((Application as any).defaultOptions ?? Application.defaultOptions as Partial<ApplicationOptions>, {
 			template: `modules/${SETTINGS.MOD_NAME}/templates/archive-manager.hbs`,
 			resizable: true,
 			minimizable: true,
 			width: 300,
 			height: 500,
-			title: "DF_CHAT_ARCHIVE.ArchiveManager_Title".localize()
+			title: "DF_CHAT_ARCHIVE.ArchiveManager_Title"
 		}) as ApplicationOptions;
 	}
 
@@ -43,11 +84,13 @@ export default class DFChatArchiveManager extends ApplicationBase {
 		element.on('click', function () {
 			const id = parseInt($(this).attr('data-id'));
 			if (isNaN(id) || !DFChatArchive.exists(id)) {
-				ui.notifications.error('DF_CHAT_ARCHIVE.ArchiveManager_ErrorBadId'.localize());
+				ui.notifications.error(game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveManager_ErrorBadId'));
 				throw Error(`Invalid id for Chat Archive: '${$(this).attr('data-id')}'`);
 			}
 			if (DFChatArchiveManager.chatViewers.has(id)) {
-				DFChatArchiveManager.chatViewers.get(id).bringToTop();
+				const viewer = DFChatArchiveManager.chatViewers.get(id) as any;
+				if (typeof viewer.bringToFront === 'function') viewer.bringToFront();
+				else viewer.bringToTop?.();
 			} else {
 				DFChatArchiveManager.chatViewers.set(id, new DFChatArchiveViewer(DFChatArchive.getArchive(id), view => {
 					DFChatArchiveManager.chatViewers.delete(view.archive.id);
@@ -60,7 +103,7 @@ export default class DFChatArchiveManager extends ApplicationBase {
 		element.on('click', async function () {
 			const id = parseInt($(this).attr('data-id'));
 			if (isNaN(id) || !DFChatArchive.exists(id)) {
-				ui.notifications.error('DF_CHAT_ARCHIVE.ArchiveManager_ErrorBadId'.localize());
+				ui.notifications.error(game.i18n.localize('DF_CHAT_ARCHIVE.ArchiveManager_ErrorBadId'));
 				throw Error(`Invalid id for Chat Archive: '${$(this).attr('data-id')}'`);
 			}
 			const archive = DFChatArchive.getArchive(id);

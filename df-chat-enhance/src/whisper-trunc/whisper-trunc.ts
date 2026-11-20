@@ -13,7 +13,7 @@ export default class WhisperTruncation {
 	private static readonly PREF_CHAR_LIMIT = 'whisper-trunc_char-limit';
 
 	static init() {
-		Hooks.on('renderChatMessage', this._messageRender.bind(this));
+		Hooks.on('renderChatMessageHTML', this._messageRender.bind(this));
 		SETTINGS.register(this.PREF_ENABLED, {
 			name: 'DF_CHAT_WHISPER_TRUNC.SettingEnabledName',
 			hint: 'DF_CHAT_WHISPER_TRUNC.SettingEnabledHint',
@@ -38,7 +38,7 @@ export default class WhisperTruncation {
 		});
 	}
 
-	private static _messageRender(message: ChatMessageData, html: JQuery<HTMLElement> | HTMLElement, _cmd: ChatMessageData) {
+	private static _messageRender(message: ChatMessageData, html: HTMLElement, _cmd: ChatMessageData) {
 		const $html = UTIL.asJQuery(html);
 		// ignore regular messages, or whispers with only 1 recipient
 		if (!SETTINGS.get(this.PREF_ENABLED) || !(message.whisper) || message.whisper.length <= 1) return;

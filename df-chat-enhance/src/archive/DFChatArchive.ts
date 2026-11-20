@@ -1,7 +1,9 @@
 import { ChatMessageData } from "@league-of-foundry-developers/foundry-vtt-types/src/foundry/common/data/data.mjs";
 import SETTINGS from "../../../common/Settings";
 
-const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+const FilePickerAPI = (globalThis as any).foundry?.applications?.apps?.FilePicker?.implementation ?? (() => {
+	throw new Error('FilePicker is unavailable in the current Foundry version.');
+})();
 
 export interface DFChatArchiveEntry {
 	id: number;
@@ -14,6 +16,18 @@ export interface DFChatArchiveEntry {
 const FormApplicationBase = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ?? FormApplication;
 
 class ArchiveFolderMenu extends FormApplicationBase {
+	static readonly DEFAULT_OPTIONS = (globalThis as any).foundry?.applications?.api?.FormApplicationV2
+		? foundry.utils.mergeObject((globalThis as any).foundry.applications.api.FormApplicationV2.DEFAULT_OPTIONS, {
+			id: 'df-chat-archive-folder',
+			position: { width: 400, height: 125 },
+			window: { title: 'DF_CHAT_ARCHIVE.Settings.ArchiveFolder_Name', resizable: false }
+		})
+		: undefined;
+
+	static readonly PARTS = (globalThis as any).foundry?.applications?.api?.FormApplicationV2 ? {
+		form: { template: 'modules/df-chat-enhance-lukas/templates/archive-folder.hbs' }
+	} : undefined;
+
 	static get defaultOptions() {
 		return foundry.utils.mergeObject(FormApplication.defaultOptions as Partial<FormApplicationOptions>, {
 			width: 400,
@@ -67,6 +81,7 @@ export class DFChatArchive {
 	static readonly PREF_FOLDER_SOURCE = 'archiveFolderSource';
 	private static readonly PREF_FOLDER_MENU = 'archiveFolderMenu';
 	private static _updateListener: () => void = null;
+	private static _discoveryInProgress = false;
 
 	private static get DATA_FOLDER(): any { return SETTINGS.get(DFChatArchive.PREF_FOLDER_SOURCE); }
 
@@ -129,10 +144,12 @@ export class DFChatArchive {
 	}
 
 	static async discoverArchivesFromFolder(): Promise<DFChatArchiveEntry[]> {
+		if (this._discoveryInProgress) return this.getLogs();
 		const folder = SETTINGS.get<string>(this.PREF_FOLDER);
-		const logs = this.getLogs();
+		const logs = SETTINGS.get<DFChatArchiveEntry[]>(this.PREF_LOGS) ?? [];
 		if (!folder) return logs;
 
+		this._discoveryInProgress = true;
 		try {
 			const result = await FilePickerAPI.browse(this.DATA_FOLDER, folder);
 			const files = (result?.files ?? [])
@@ -166,7 +183,10 @@ export class DFChatArchive {
 				});
 			}
 
-			if (logs.length === 0 && entries.length > 0) {
+			const sameIndex = entries.length === logs.length
+				&& entries.every((entry, idx) => entry.filepath === logs[idx]?.filepath && entry.filename === logs[idx]?.filename && entry.name === logs[idx]?.name);
+
+			if (!sameIndex && entries.length > 0) {
 				await SETTINGS.set(this.PREF_LOGS, entries);
 				if (this._updateListener != null) this._updateListener();
 			}
@@ -174,15 +194,13 @@ export class DFChatArchive {
 		} catch (error) {
 			console.warn(`DF Chat Archive: could not scan archive folder ${folder}`, error);
 			return logs;
+		} finally {
+			this._discoveryInProgress = false;
 		}
 	}
 
 	static getLogs(): DFChatArchiveEntry[] {
-		const logs = SETTINGS.get<DFChatArchiveEntry[]>(this.PREF_LOGS) ?? [];
-		if (logs.length === 0) {
-			void this.discoverArchivesFromFolder();
-		}
-		return logs;
+		return SETTINGS.get<DFChatArchiveEntry[]>(this.PREF_LOGS) ?? [];
 	}
 	static getArchive(id: number): DFChatArchiveEntry { return this.getLogs().find(x => x.id == id); }
 	static exists(id: number): boolean { return !!this.getLogs().find(x => x.id == id); }
